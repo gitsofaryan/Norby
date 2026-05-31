@@ -40,7 +40,9 @@ export default function ChatPage() {
     selectedHotspot,
     setSelectedHotspot,
     requestJoin,
-    setSelectedUser
+    setSelectedUser,
+    leaveHotspot,
+    sendMessage
   } = useMapContext();
 
   const {
@@ -967,7 +969,7 @@ export default function ChatPage() {
                           </p>
                         </div>
                         <button
-                          onClick={leaveHotspot}
+                          onClick={() => leaveHotspot()}
                           className="w-full mt-2 py-3 rounded-2xl border border-zinc-200 text-zinc-500 hover:text-zinc-700 hover:bg-zinc-50 text-xs font-bold transition-all active:scale-[0.98] cursor-pointer"
                         >
                           Cancel Request

@@ -274,7 +274,7 @@ export function HotspotDrawer() {
                 </div>
 
                 <button
-                  onClick={leaveHotspot}
+                  onClick={() => leaveHotspot()}
                   className="mt-2 w-full py-3.5 rounded-2xl border border-rose-200 hover:bg-rose-50 text-rose-600 text-xs font-bold transition-all flex items-center justify-center gap-1.5 active:scale-[0.98]"
                 >
                   <Trash2 size={13} /> Delete Hotspot Room
@@ -319,7 +319,7 @@ export function HotspotDrawer() {
                       </p>
                     </div>
                     <button
-                      onClick={leaveHotspot}
+                      onClick={() => leaveHotspot()}
                       className="w-full py-3 rounded-2xl border border-zinc-200 text-zinc-500 hover:text-zinc-700 hover:bg-zinc-50 text-xs font-bold transition-all active:scale-[0.98]"
                     >
                       Cancel Request
@@ -400,7 +400,7 @@ export function HotspotDrawer() {
                     </div>
 
                     <button
-                      onClick={leaveHotspot}
+                      onClick={() => leaveHotspot()}
                       className="mt-2 w-full py-3 rounded-2xl border border-zinc-200 text-zinc-500 hover:text-rose-600 hover:bg-rose-50/50 text-xs font-bold transition-all flex items-center justify-center gap-1.5 active:scale-[0.98]"
                     >
                       <LogOut size={13} /> Leave Hotspot Room
