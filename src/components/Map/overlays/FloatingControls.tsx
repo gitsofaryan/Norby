@@ -25,6 +25,9 @@ function FloatingControlsInner() {
     setShowSpaceDrawer,
     incomingStreams,
     mySpeakStatus,
+    isMutedByHost,
+    isLocalMicMuted,
+    toggleLocalMic,
   } = useMapContext();
 
   const isInAnotherSpace = !isSpaceHost && (Object.keys(incomingStreams).length > 0 || mySpeakStatus !== "listener");
@@ -118,7 +121,7 @@ function FloatingControlsInner() {
       </div>
 
       {/* Live Mic Toggle & Space Drawer Control (Below Notifications) */}
-      {isSignedIn && !isInAnotherSpace && (
+      {isSignedIn && (
         <div className="pointer-events-auto absolute top-[120px] right-4 z-[410] flex flex-col gap-2">
           {/* Main Broadcast Toggle */}
           <button

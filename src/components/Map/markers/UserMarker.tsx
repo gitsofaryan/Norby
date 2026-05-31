@@ -362,7 +362,7 @@ export function UserMarker({ item }: UserMarkerProps) {
   const isFriend = item.type === "user" && friends.some((f) => f.user_id === item.raw?.user_id);
   const isBroadcasting = item.type === "me" 
     ? isBroadcastingAudio 
-    : (isFriend ? !!item.raw?.is_broadcasting_audio : false);
+    : !!item.raw?.is_broadcasting_audio;
 
   // Fix Leaflet stale closure bug by saving latest parameters in a Ref
   const onClickRef = useRef<any>(null);

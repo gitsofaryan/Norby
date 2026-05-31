@@ -52,6 +52,13 @@ export function useWebRTC({
 
   const localStreamRef = useRef<MediaStream | null>(null);
   const peerConnectionsRef = useRef<Record<string, RTCPeerConnection>>({});
+  
+  // Web Audio API refs for P2P SFU Mixing
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const listenerMixNodeRef = useRef<MediaStreamAudioDestinationNode | null>(null);
+  const hostSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const peerMixNodesRef = useRef<Record<string, MediaStreamAudioDestinationNode>>({});
+  const sourceNodesRef = useRef<Record<string, MediaStreamAudioSourceNode>>({});
 
   const handlePeerDisconnect = useCallback((targetUserId: string) => {
     const pc = peerConnectionsRef.current[targetUserId];
@@ -65,6 +72,15 @@ export function useWebRTC({
       delete copy[targetUserId];
       return copy;
     });
+    
+    if (sourceNodesRef.current[targetUserId]) {
+      sourceNodesRef.current[targetUserId].disconnect();
+      delete sourceNodesRef.current[targetUserId];
+    }
+    if (peerMixNodesRef.current[targetUserId]) {
+      delete peerMixNodesRef.current[targetUserId];
+    }
+
     setActiveListeners((prev) => prev.filter((l) => l.user_id !== targetUserId));
     setActiveSpeakers((prev) => prev.filter((s) => s.user_id !== targetUserId));
     setSpeakRequests((prev) => prev.filter((r) => r.user_id !== targetUserId));
@@ -85,10 +101,27 @@ export function useWebRTC({
     };
 
     pc.ontrack = (event) => {
+      const stream = event.streams[0];
       setIncomingStreams((prev) => ({
         ...prev,
-        [targetUserId]: event.streams[0],
+        [targetUserId]: stream,
       }));
+
+      // If we are Host and have audio mixing initialized
+      if (audioCtxRef.current && listenerMixNodeRef.current) {
+        const sourceNode = audioCtxRef.current.createMediaStreamSource(stream);
+        sourceNodesRef.current[targetUserId] = sourceNode;
+        
+        // Add to main listener mix
+        sourceNode.connect(listenerMixNodeRef.current);
+        
+        // Add to all other speakers' custom N-1 mix nodes
+        Object.entries(peerMixNodesRef.current).forEach(([id, mixNode]) => {
+          if (id !== targetUserId) {
+            sourceNode.connect(mixNode);
+          }
+        });
+      }
     };
 
     pc.oniceconnectionstatechange = () => {
@@ -108,8 +141,17 @@ export function useWebRTC({
       localStreamRef.current = stream;
       setIsBroadcastingAudio(true);
       setIsLocalMicMuted(false);
+      
       if (isHost) {
         setIsSpaceHost(true);
+        // Initialize SFU Mixing
+        if (!audioCtxRef.current) {
+          const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+          audioCtxRef.current = new AudioContextClass();
+          listenerMixNodeRef.current = audioCtxRef.current.createMediaStreamDestination();
+        }
+        hostSourceRef.current = audioCtxRef.current.createMediaStreamSource(stream);
+        hostSourceRef.current.connect(listenerMixNodeRef.current!);
       }
     } catch (err) {
       console.error("[WebRTC] Failed to get local audio:", err);
@@ -139,6 +181,15 @@ export function useWebRTC({
     setActiveSpeakers([]);
     setSpeakRequests([]);
     setActiveListeners([]);
+    
+    // Cleanup mixing
+    Object.values(sourceNodesRef.current).forEach(n => n.disconnect());
+    sourceNodesRef.current = {};
+    peerMixNodesRef.current = {};
+    if (hostSourceRef.current) {
+      hostSourceRef.current.disconnect();
+      hostSourceRef.current = null;
+    }
   };
 
   const startListening = async (targetUserId: string) => {
@@ -198,7 +249,7 @@ export function useWebRTC({
       return [...prev, { user_id: speakerUserId, username, avatar_url: avatarUrl, isMuted: false }];
     });
     sendRtcAnswer(speakerUserId, { type: "speak_approved" });
-    startListening(speakerUserId);
+    // startListening is now triggered when the speaker sends "speaker_ready"
   };
 
   const declineSpeaker = (speakerUserId: string) => {
@@ -268,6 +319,10 @@ export function useWebRTC({
     const { sender_id, offer } = msg;
     if (!offer) return;
 
+    // We must use refs or latest state for activeSpeakers since it's dynamic
+    // but the best way inside useCallback is using the state passed via MapProvider if needed,
+    // or just rely on peerMixNodes tracking for active speakers.
+    
     if (offer.type === "speak_request") {
       setSpeakRequests((prev) => {
         if (prev.some((r) => r.user_id === sender_id)) return prev;
@@ -278,6 +333,11 @@ export function useWebRTC({
 
     if (offer.type === "speak_cancel") {
       setSpeakRequests((prev) => prev.filter((r) => r.user_id !== sender_id));
+      return;
+    }
+
+    if (offer.type === "speaker_ready") {
+      startListening(sender_id);
       return;
     }
 
@@ -314,11 +374,7 @@ export function useWebRTC({
 
       setActiveListeners((prev) => {
         if (prev.some((l) => l.user_id === sender_id)) return prev;
-        return [...prev, {
-          user_id: sender_id,
-          username: offer.username || "Listener",
-          avatar_url: offer.avatar_url
-        }];
+        return [...prev, { user_id: sender_id, username: offer.username || "Listener", avatar_url: offer.avatar_url }];
       });
 
       const pc = peerConnectionsRef.current[sender_id] || createPeerConnection(sender_id, false);
@@ -327,14 +383,63 @@ export function useWebRTC({
           type: "offer",
           sdp: offer.sdp,
         }));
-        localStreamRef.current.getTracks().forEach((track) => {
-          pc.addTrack(track, localStreamRef.current!);
+        
+        // Determine what stream to send back
+        let outStream = localStreamRef.current;
+        if (audioCtxRef.current && listenerMixNodeRef.current) {
+          outStream = listenerMixNodeRef.current.stream;
+        }
+
+        outStream.getTracks().forEach((track) => {
+          pc.addTrack(track, outStream);
         });
+        
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
         sendRtcAnswer(sender_id, { type: "answer", sdp: answer.sdp });
       } catch (err) {
         console.error("[WebRTC] Error handling receive-only offer:", err);
+      }
+      return;
+    }
+
+    // Handle Speaker Renegotiation (Listener -> Speaker upgrade)
+    if (offer.type === "webrtc_speaker_offer") {
+      const pc = peerConnectionsRef.current[sender_id];
+      if (!pc) return; // Must have an existing connection to upgrade
+      
+      try {
+        await pc.setRemoteDescription(new RTCSessionDescription({
+          type: "offer",
+          sdp: offer.sdp,
+        }));
+
+        // Setup custom N-1 mix for this new speaker
+        if (audioCtxRef.current && hostSourceRef.current) {
+          const mixNode = audioCtxRef.current.createMediaStreamDestination();
+          hostSourceRef.current.connect(mixNode);
+          
+          Object.entries(sourceNodesRef.current).forEach(([id, sourceNode]) => {
+            if (id !== sender_id) {
+              sourceNode.connect(mixNode);
+            }
+          });
+          peerMixNodesRef.current[sender_id] = mixNode;
+          
+          // Replace track for this speaker with their custom mix
+          const senders = pc.getSenders();
+          if (senders.length > 0) {
+            senders[0].replaceTrack(mixNode.stream.getAudioTracks()[0]);
+          } else {
+            mixNode.stream.getTracks().forEach(t => pc.addTrack(t, mixNode.stream));
+          }
+        }
+
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        sendRtcAnswer(sender_id, { type: "answer", sdp: answer.sdp });
+      } catch (err) {
+        console.error("[WebRTC] Error handling speaker offer upgrade:", err);
       }
       return;
     }
@@ -347,7 +452,16 @@ export function useWebRTC({
     if (answer.type === "speak_approved") {
       setMySpeakStatus("speaker");
       setIsMutedByHost(false);
-      startBroadcast(false);
+      await startBroadcast(false);
+      
+      const pc = peerConnectionsRef.current[sender_id];
+      if (pc && localStreamRef.current) {
+        // Upgrade existing connection
+        localStreamRef.current.getTracks().forEach(track => pc.addTrack(track, localStreamRef.current!));
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        sendRtcOffer(sender_id, { type: "webrtc_speaker_offer", sdp: offer.sdp });
+      }
       return;
     }
 

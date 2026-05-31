@@ -16,6 +16,7 @@ import { VibeFilterBar } from "./overlays/VibeFilterBar";
 import { FloatingControls } from "./overlays/FloatingControls";
 import { IntentModal } from "./overlays/IntentModal";
 import { RouteHUD } from "./overlays/RouteHUD";
+import { CallOverlay } from "./CallOverlay";
 
 // private MapController component to synchronize Leaflet instance states
 function MapController({
@@ -353,6 +354,7 @@ function LiveMapContent() {
       <HotspotDrawer />
       <UserDrawer />
       <SpaceDrawer />
+      <CallOverlay />
       
 
 
