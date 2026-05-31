@@ -16,7 +16,9 @@ import {
   UserCheck,
   UserPlus,
   Loader2,
-  Trash2
+  Trash2,
+  Lock,
+  LogOut
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -64,6 +66,8 @@ export default function ChatPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isTypingRef = useRef(false);
+  const [showSafetyTips, setShowSafetyTips] = useState(false);
+  const [copiedSOS, setCopiedSOS] = useState(false);
 
   // Sync activeChatUser state when path changes (fixes browser and UI back buttons)
   useEffect(() => {
@@ -301,6 +305,7 @@ export default function ChatPage() {
                       const isMember = hotspot.requests?.some(
                         (r: any) => r.user_id === myUserId && r.status === "accepted"
                       );
+                      const isSelected = selectedHotspot?.id === hotspot.id && !activeChatUser;
 
                       const distance = location
                         ? getDistanceKm(location.lat, location.lng, hotspot.lat, hotspot.lng)
@@ -312,13 +317,22 @@ export default function ChatPage() {
                           initial={{ opacity: 0, y: 10 }}
                           animate={{ opacity: 1, y: 0 }}
                           exit={{ opacity: 0, scale: 0.95 }}
-                          className="p-4 bg-zinc-50 border border-zinc-100 rounded-2xl flex flex-col gap-3 shadow-sm hover:border-zinc-200 transition-all"
+                          onClick={() => {
+                            setSelectedHotspot(hotspot);
+                            setActiveChatUser(null);
+                          }}
+                          className={`p-4 border rounded-2xl flex flex-col gap-3 transition-all cursor-pointer ${
+                            isSelected
+                              ? "bg-zinc-50 border-zinc-200/80 shadow-sm"
+                              : "bg-transparent border-transparent hover:bg-zinc-50/60"
+                          }`}
                         >
                           <div className="flex items-center gap-3">
                             {/* Host Avatar */}
                             <div className="relative">
                              <button
-                                onClick={() => {
+                                onClick={(e) => {
+                                  e.stopPropagation();
                                   setSelectedUser({
                                     user_id: hotspot.host_id,
                                     username: hotspot.host_username,
@@ -362,15 +376,32 @@ export default function ChatPage() {
                           {/* Action Bar */}
                           <div className="flex gap-2">
                             {isHost || isMember ? (
-                              <button
-                                onClick={() => {
-                                  setSelectedHotspot(hotspot);
-                                  router.push("/");
-                                }}
-                                className="flex-1 py-2 px-3 bg-zinc-900 hover:bg-black text-white text-[10px] font-black uppercase tracking-wider rounded-xl transition-all active:scale-95 shadow-sm text-center cursor-pointer font-extrabold"
-                              >
-                                View on Map
-                              </button>
+                              <>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedHotspot(hotspot);
+                                    setActiveChatUser(null);
+                                  }}
+                                  className={`flex-1 py-2 px-3 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all active:scale-95 shadow-sm text-center cursor-pointer font-extrabold ${
+                                    isSelected
+                                      ? "bg-zinc-900 text-white hover:bg-black"
+                                      : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200"
+                                  }`}
+                                >
+                                  Chat
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedHotspot(hotspot);
+                                    router.push("/");
+                                  }}
+                                  className="py-2 px-3 bg-zinc-950 text-white text-[10px] font-black uppercase tracking-wider rounded-xl transition-all active:scale-95 shadow-sm text-center cursor-pointer font-extrabold"
+                                >
+                                  Map
+                                </button>
+                              </>
                             ) : hasPending ? (
                               <button
                                 disabled
@@ -380,7 +411,8 @@ export default function ChatPage() {
                               </button>
                             ) : (
                               <button
-                                onClick={() => {
+                                onClick={(e) => {
+                                  e.stopPropagation();
                                   setSelectedHotspot(hotspot);
                                   requestJoin(hotspot.id);
                                   addToast(`Requested to join @${hotspot.host_username}'s gathering!`);
@@ -470,10 +502,11 @@ export default function ChatPage() {
           </div>
         </div>
 
-        {/* Right pane: Active DM Chat window */}
+        {/* Right pane: Active DM or Hotspot Chat window */}
         <div
-          className={`flex-1 h-full flex flex-col bg-zinc-50 relative ${!activeChatUser ? "hidden md:flex" : "flex"
-            }`}
+          className={`flex-1 h-full flex flex-col bg-zinc-50 relative ${
+            (!activeChatUser && !selectedHotspot) ? "hidden md:flex" : "flex"
+          }`}
         >
           {activeChatUser ? (
             <>
@@ -648,6 +681,323 @@ export default function ChatPage() {
                 </button>
               </form>
             </>
+          ) : selectedHotspot ? (
+            (() => {
+              const isSelectedHotspotHost = selectedHotspot.host_id === myUserId;
+              const isSelectedHotspotMember = selectedHotspot.requests?.some(
+                (r: any) => r.user_id === myUserId && r.status === "accepted"
+              );
+              const selectedHotspotGuestStatus = selectedHotspot.requests?.find(
+                (r: any) => r.user_id === myUserId
+              )?.status || "none";
+              const showHotspotChat = isSelectedHotspotHost || isSelectedHotspotMember;
+
+              if (showHotspotChat) {
+                return (
+                  <>
+                    {/* Hotspot Chat Header */}
+                    <div className="p-4 border-b border-zinc-100 bg-white shadow-sm z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <button
+                          onClick={() => {
+                            setSelectedHotspot(null);
+                          }}
+                          className="p-2 -ml-2 rounded-xl text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 active:scale-95 md:hidden transition-all cursor-pointer flex-shrink-0"
+                        >
+                          <ArrowLeft className="w-5 h-5" />
+                        </button>
+
+                        <div className="relative flex-shrink-0">
+                          <div className="w-12 h-12 rounded-xl bg-zinc-100 overflow-hidden border border-zinc-200 flex items-center justify-center text-xl">
+                            {selectedHotspot.vibeEmoji || "🔥"}
+                          </div>
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                          <h2 className="font-bold text-base text-zinc-950 truncate leading-tight">
+                            {selectedHotspot.title}
+                          </h2>
+                          <div className="text-[10px] text-zinc-400 flex items-center gap-1 font-bold whitespace-nowrap overflow-hidden text-ellipsis">
+                            📍 {selectedHotspot.host_username ? `@${selectedHotspot.host_username}` : "Host"} · {selectedHotspot.requests?.filter((r: any) => r.status === "accepted").length || 0} joined
+                          </div>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => {
+                              router.push("/");
+                            }}
+                            className="px-3 py-2 bg-zinc-100 hover:bg-zinc-200 text-zinc-800 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all active:scale-95 shadow-sm text-center cursor-pointer font-extrabold"
+                          >
+                            Map
+                          </button>
+                          {isSelectedHotspotHost ? (
+                            <button
+                              onClick={() => {
+                                if (confirm("Delete this hotspot room?")) {
+                                  leaveHotspot();
+                                }
+                              }}
+                              title="Delete Hotspot"
+                              className="p-2 rounded-xl text-zinc-400 hover:text-rose-500 hover:bg-rose-50 active:scale-95 transition-all cursor-pointer"
+                            >
+                              <Trash2 className="w-4.5 h-4.5" />
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => {
+                                if (confirm("Leave this hotspot room?")) {
+                                  leaveHotspot();
+                                }
+                              }}
+                              title="Leave Hotspot"
+                              className="p-2 rounded-xl text-zinc-400 hover:text-rose-500 hover:bg-rose-50 active:scale-95 transition-all cursor-pointer"
+                            >
+                              <LogOut className="w-4.5 h-4.5" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Messages & Safety Info Area */}
+                    <div className="flex-1 overflow-y-auto flex flex-col bg-white md:bg-zinc-50">
+                      {/* Safety SOS Banner */}
+                      <div className="mx-4 md:mx-6 mt-4 bg-amber-50/60 border border-amber-200/50 rounded-2xl p-3.5 text-zinc-800 shadow-sm">
+                        <div className="flex justify-between items-center">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm">🛡️</span>
+                            <span className="text-[11px] font-bold text-amber-900">Physical Meetup Safety Tips</span>
+                          </div>
+                          <button
+                            onClick={() => setShowSafetyTips(!showSafetyTips)}
+                            className="text-[10px] font-semibold text-amber-800 underline hover:text-amber-900 cursor-pointer"
+                          >
+                            {showSafetyTips ? "Hide Tips" : "Show Tips & SOS"}
+                          </button>
+                        </div>
+
+                        {showSafetyTips && (
+                          <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: "auto" }}
+                            className="mt-2.5 pt-2.5 border-t border-amber-200/40 space-y-2 text-[10px] text-amber-950 font-medium"
+                          >
+                            <ul className="list-disc pl-3.5 space-y-1">
+                              <li>Meet in a busy, well-lit public space.</li>
+                              <li>Share this location and meetup details with a trusted friend.</li>
+                              <li>Keep your phone charged and in your hand.</li>
+                              <li>If you feel unsafe at any point, walk away immediately.</li>
+                            </ul>
+                            {location && (
+                              <button
+                                onClick={() => {
+                                  const sosMsg = `🚨 [SOS Alert] I am meeting someone for Norby hotspot "${selectedHotspot.title}". My current location is: https://maps.google.com/?q=${location.lat},${location.lng} (Coordinates: ${location.lat.toFixed(5)}, ${location.lng.toFixed(5)})`;
+                                  navigator.clipboard.writeText(sosMsg);
+                                  setCopiedSOS(true);
+                                  setTimeout(() => setCopiedSOS(false), 2000);
+                                }}
+                                className={`w-full mt-2 py-2 rounded-xl text-[10px] font-bold transition-all active:scale-[0.98] cursor-pointer ${
+                                  copiedSOS
+                                    ? "bg-emerald-600 text-white"
+                                    : "bg-amber-600 hover:bg-amber-700 text-white"
+                                }`}
+                              >
+                                {copiedSOS ? "✓ SOS Info Copied to Clipboard!" : "🚨 Copy SOS Coordinates & Details"}
+                              </button>
+                            )}
+                          </motion.div>
+                        )}
+                      </div>
+
+                      {/* Messages scroll content */}
+                      <div className="flex-1 p-4 md:p-6 space-y-3 md:space-y-4 flex flex-col">
+                        {!selectedHotspot.messages || selectedHotspot.messages.length === 0 ? (
+                          <div className="flex-1 flex flex-col items-center justify-center text-zinc-400 select-none py-12">
+                            <MessageSquare className="w-10 h-10 mb-3 opacity-40 text-zinc-300" />
+                            <p className="text-sm font-bold text-zinc-700">Say hello to the group!</p>
+                            <p className="text-xs opacity-85 mt-1">Start typing below to coordinate with everyone.</p>
+                          </div>
+                        ) : (
+                          selectedHotspot.messages.map((m: any) => {
+                            const isMe = m.sender_id === myUserId;
+                            const timeStr = new Date(m.timestamp).toLocaleTimeString([], {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            });
+
+                            return (
+                              <div
+                                key={m.id}
+                                className={`flex gap-2.5 max-w-[85%] md:max-w-[60%] ${
+                                  isMe ? "self-end flex-row-reverse" : "self-start"
+                                }`}
+                              >
+                                {!isMe && (
+                                  <button
+                                    onClick={() => {
+                                      setSelectedUser({
+                                        user_id: m.sender_id,
+                                        username: m.sender_username,
+                                        avatar_url: m.sender_avatar,
+                                        vibeEmoji: selectedHotspot.vibeEmoji || "🔥",
+                                        bio: "",
+                                        selectedTags: [],
+                                        gender: "",
+                                        age: "",
+                                      });
+                                      router.push("/");
+                                    }}
+                                    className="w-8 h-8 rounded-xl bg-zinc-100 overflow-hidden border border-zinc-200 shrink-0 object-cover cursor-pointer active:scale-95 transition-all mt-0.5"
+                                    title={`View @${m.sender_username}'s profile`}
+                                  >
+                                    <img
+                                      src={m.sender_avatar || getAvatarUrl(m.sender_username)}
+                                      className="w-full h-full object-cover"
+                                      alt=""
+                                    />
+                                  </button>
+                                )}
+                                <div className={`flex flex-col ${isMe ? "items-end" : "items-start"}`}>
+                                  {!isMe && (
+                                    <span className="text-[10px] font-bold text-zinc-500 ml-1 mb-0.5">
+                                      @{m.sender_username}
+                                    </span>
+                                  )}
+                                  <div
+                                    className={`px-4 py-3 text-sm leading-relaxed shadow-sm transition-all rounded-2xl ${
+                                      isMe
+                                        ? "bg-zinc-900 text-white rounded-tr-none font-medium"
+                                        : "bg-white border border-zinc-200/60 text-zinc-900 rounded-tl-none font-medium"
+                                    }`}
+                                  >
+                                    {m.text}
+                                  </div>
+                                  <span className="text-[8px] md:text-[9px] text-zinc-400 mt-1 px-1 font-bold">
+                                    {timeStr}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })
+                        )}
+                        <div ref={messagesEndRef} />
+                      </div>
+                    </div>
+
+                    {/* Composer input */}
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        if (!typedMessage.trim()) return;
+                        sendMessage(typedMessage.trim());
+                        setTypedMessage("");
+                      }}
+                      className="p-4 border-t border-zinc-100 bg-white flex items-center gap-3"
+                    >
+                      <input
+                        type="text"
+                        value={typedMessage}
+                        onChange={(e) => setTypedMessage(e.target.value)}
+                        maxLength={200}
+                        placeholder="Message the hotspot room..."
+                        className="flex-1 py-3.5 px-4.5 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-900 text-sm placeholder-zinc-400 focus:outline-none focus:border-zinc-300 focus:bg-white transition-all font-medium"
+                      />
+
+                      <button
+                        type="submit"
+                        disabled={!typedMessage.trim()}
+                        className="p-3.5 rounded-2xl bg-zinc-900 text-white font-bold disabled:opacity-40 disabled:scale-100 hover:bg-black hover:scale-105 active:scale-95 transition-all shadow-md cursor-pointer"
+                      >
+                        <Send className="w-4 h-4 fill-white text-white" />
+                      </button>
+                    </form>
+                  </>
+                );
+              } else {
+                return (
+                  <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-white">
+                    {/* Back button for mobile */}
+                    <button
+                      onClick={() => {
+                        setSelectedHotspot(null);
+                      }}
+                      className="absolute top-4 left-4 p-2 rounded-xl text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 active:scale-95 md:hidden transition-all cursor-pointer"
+                    >
+                      <ArrowLeft className="w-5 h-5" />
+                    </button>
+
+                    {selectedHotspotGuestStatus === "none" && (
+                      <div className="max-w-sm flex flex-col items-center gap-4">
+                        <div className="w-16 h-16 rounded-2xl bg-zinc-50 border border-zinc-100 flex items-center justify-center text-zinc-400">
+                          <Lock size={24} strokeWidth={1.5} />
+                        </div>
+                        <div>
+                          <h3 className="text-base font-bold text-zinc-900">Locked Hotspot Room</h3>
+                          <p className="text-xs text-zinc-500 mt-2 leading-relaxed">
+                            Request to join this hotspot. Once approved by the host (@{selectedHotspot.host_username}), you'll join the private group chat to coordinate.
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => {
+                            requestJoin(selectedHotspot.id);
+                            addToast(`Requested to join @${selectedHotspot.host_username}'s gathering!`);
+                          }}
+                          className="w-full mt-2 py-3.5 rounded-2xl bg-zinc-900 hover:bg-black text-white text-xs font-bold transition-all active:scale-[0.98] shadow-sm flex items-center justify-center gap-1.5 cursor-pointer"
+                        >
+                          Request to Join Room
+                        </button>
+                      </div>
+                    )}
+
+                    {selectedHotspotGuestStatus === "pending" && (
+                      <div className="max-w-sm flex flex-col items-center gap-4">
+                        <motion.div
+                          animate={{ scale: [1, 1.08, 1], opacity: [0.6, 1, 0.6] }}
+                          transition={{ repeat: Infinity, duration: 1.8 }}
+                          className="w-16 h-16 rounded-2xl bg-zinc-50 border border-zinc-100 flex items-center justify-center text-zinc-400"
+                        >
+                          <Loader2 className="animate-spin text-zinc-400" size={24} strokeWidth={1.5} />
+                        </motion.div>
+                        <div>
+                          <h3 className="text-base font-bold text-zinc-900">Request Pending Approval</h3>
+                          <p className="text-xs text-zinc-400 mt-2 leading-relaxed">
+                            We notified the host. Hang tight! They will approve your request shortly.
+                          </p>
+                        </div>
+                        <button
+                          onClick={leaveHotspot}
+                          className="w-full mt-2 py-3 rounded-2xl border border-zinc-200 text-zinc-500 hover:text-zinc-700 hover:bg-zinc-50 text-xs font-bold transition-all active:scale-[0.98] cursor-pointer"
+                        >
+                          Cancel Request
+                        </button>
+                      </div>
+                    )}
+
+                    {selectedHotspotGuestStatus === "declined" && (
+                      <div className="max-w-sm flex flex-col items-center gap-4">
+                        <div className="w-16 h-16 rounded-2xl bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-500">
+                          <X size={24} strokeWidth={2} />
+                        </div>
+                        <div>
+                          <h3 className="text-base font-bold text-zinc-900">Request Declined</h3>
+                          <p className="text-xs text-zinc-400 mt-2 leading-relaxed">
+                            Your request to join this hotspot was declined by the host. Explore other hotspots nearby!
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => setSelectedHotspot(null)}
+                          className="w-full mt-2 py-3 rounded-2xl bg-zinc-100 text-zinc-600 hover:bg-zinc-200 text-xs font-bold transition-all active:scale-[0.98] cursor-pointer"
+                        >
+                          Close
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+            })()
           ) : (
             // Desktop placeholder when no active conversation selected
             <div className="flex-1 hidden md:flex flex-col items-center justify-center p-8 text-center text-zinc-400 select-none">
@@ -656,7 +1006,7 @@ export default function ChatPage() {
               </div>
               <h3 className="text-base font-bold text-zinc-700 mb-1">Select a Conversation</h3>
               <p className="text-xs text-zinc-400 max-w-xs leading-normal">
-                Choose a contact from the list or accept pending connection requests to start exchanging end-to-end 1-hour self-destructing messages.
+                Choose a contact or hotspot from the list to start exchanging end-to-end 1-hour self-destructing messages.
               </p>
             </div>
           )}
