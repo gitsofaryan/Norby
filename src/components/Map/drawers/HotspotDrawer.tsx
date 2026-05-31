@@ -1,4 +1,5 @@
 "use client";
+import { useState } from "react";
 
 import { useMapContext } from "../MapProvider";
 import { getAvatarUrl } from "@/hooks/useAuth";
@@ -22,6 +23,8 @@ export function HotspotDrawer() {
     setSelectedUser,
     activeUsers,
   } = useMapContext();
+
+  const [activeTab, setActiveTab] = useState<"info" | "chat">("info");
 
   const handleUserClick = (targetUserId: string, targetUsername: string, targetAvatarUrl?: string) => {
     if (targetUserId === myUserId) return;
@@ -175,110 +178,129 @@ export function HotspotDrawer() {
             {/* Host vs Guest Views */}
             {isHost ? (
               <div className="mt-4 flex flex-col gap-4">
-                {/* Requests */}
-                <div>
-                  <h4 className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                    <Users size={12} /> Join Requests
-                  </h4>
-                  {selectedHotspot.requests.filter((r: any) => r.status === "pending").length ===
-                    0 ? (
-                    <p className="text-[11px] text-zinc-400 bg-zinc-50 rounded-2xl p-4 text-center border border-dashed border-zinc-100">
-                      Waiting for nearby requests to join...
-                    </p>
-                  ) : (
-                    <div className="flex flex-col gap-2 max-h-[140px] overflow-y-auto pr-1">
-                      {selectedHotspot.requests
-                        .filter((r: any) => r.status === "pending")
-                        .map((r: any) => (
-                          <div
-                            key={r.user_id}
-                            className="flex justify-between items-center bg-zinc-50 border border-zinc-100 rounded-2xl p-3"
-                          >
-                            <div
-                              onClick={() => handleUserClick(r.user_id, r.username, r.avatar_url)}
-                              className="flex items-center gap-2.5 cursor-pointer hover:opacity-80 transition-opacity"
-                            >
-                              <img
-                                src={r.avatar_url}
-                                className="w-8 h-8 rounded-full border border-zinc-200"
-                                alt={r.username}
-                              />
-                              <span className="text-xs font-semibold text-zinc-800 hover:underline">
-                                @{r.username}
-                              </span>
-                            </div>
-                            <div className="flex gap-2">
-                              <button
-                                onClick={() => respondRequest(r.user_id, "accepted")}
-                                className="px-3.5 py-1.5 rounded-xl bg-zinc-900 hover:bg-black text-white text-[10px] font-bold transition-all active:scale-95 shadow-sm"
+                <div className="flex bg-zinc-100 p-1 rounded-xl">
+                  <button
+                    onClick={() => setActiveTab("info")}
+                    className={`flex-1 py-2 text-[11px] font-bold rounded-lg transition-all ${
+                      activeTab === "info" ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-500 hover:text-zinc-700"
+                    }`}
+                  >
+                    Room Info
+                  </button>
+                  <button
+                    onClick={() => setActiveTab("chat")}
+                    className={`flex-1 py-2 text-[11px] font-bold rounded-lg transition-all ${
+                      activeTab === "chat" ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-500 hover:text-zinc-700"
+                    }`}
+                  >
+                    Live Chat
+                  </button>
+                </div>
+
+                {activeTab === "info" ? (
+                  <div className="flex flex-col gap-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                    {/* Requests */}
+                    <div>
+                      <h4 className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                        <Users size={12} /> Join Requests
+                      </h4>
+                      {selectedHotspot.requests.filter((r: any) => r.status === "pending").length ===
+                        0 ? (
+                        <p className="text-[11px] text-zinc-400 bg-zinc-50 rounded-2xl p-4 text-center border border-dashed border-zinc-100">
+                          Waiting for nearby requests to join...
+                        </p>
+                      ) : (
+                        <div className="flex flex-col gap-2 max-h-[140px] overflow-y-auto pr-1">
+                          {selectedHotspot.requests
+                            .filter((r: any) => r.status === "pending")
+                            .map((r: any) => (
+                              <div
+                                key={r.user_id}
+                                className="flex justify-between items-center bg-zinc-50 border border-zinc-100 rounded-2xl p-3"
                               >
-                                Accept
-                              </button>
-                              <button
-                                onClick={() => respondRequest(r.user_id, "declined")}
-                                className="px-3 py-1.5 rounded-xl bg-white border border-zinc-200 hover:border-zinc-300 text-zinc-600 text-[10px] font-bold transition-all active:scale-95"
-                              >
-                                Decline
-                              </button>
-                            </div>
-                          </div>
-                        ))}
+                                <div
+                                  onClick={() => handleUserClick(r.user_id, r.username, r.avatar_url)}
+                                  className="flex items-center gap-2.5 cursor-pointer hover:opacity-80 transition-opacity"
+                                >
+                                  <img
+                                    src={r.avatar_url}
+                                    className="w-8 h-8 rounded-full border border-zinc-200"
+                                    alt={r.username}
+                                  />
+                                  <span className="text-xs font-semibold text-zinc-800 hover:underline">
+                                    @{r.username}
+                                  </span>
+                                </div>
+                                <div className="flex gap-2">
+                                  <button
+                                    onClick={() => respondRequest(r.user_id, "accepted")}
+                                    className="px-3.5 py-1.5 rounded-xl bg-zinc-900 hover:bg-black text-white text-[10px] font-bold transition-all active:scale-95 shadow-sm"
+                                  >
+                                    Accept
+                                  </button>
+                                  <button
+                                    onClick={() => respondRequest(r.user_id, "declined")}
+                                    className="px-3 py-1.5 rounded-xl bg-white border border-zinc-200 hover:border-zinc-300 text-zinc-600 text-[10px] font-bold transition-all active:scale-95"
+                                  >
+                                    Decline
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
 
-                {/* Members */}
-                <div>
-                  <h4 className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider mb-2">
-                    Members (
-                    {selectedHotspot.requests.filter((r: any) => r.status === "accepted").length}
-                    )
-                  </h4>
-                  <div className="flex flex-wrap gap-1.5">
-                    {selectedHotspot.requests
-                      .filter((r: any) => r.status === "accepted")
-                      .map((r: any) => {
-                        const isMe = r.user_id === myUserId;
-                        return (
-                          <div
-                            key={r.user_id}
-                            onClick={() => !isMe && handleUserClick(r.user_id, r.username, r.avatar_url)}
-                            className={`flex items-center gap-1.5 bg-zinc-100 border border-zinc-200/50 rounded-full pl-1.5 pr-3 py-1 text-[10px] font-semibold text-zinc-700 ${
-                              !isMe ? "cursor-pointer hover:bg-zinc-200 transition-colors" : ""
-                            }`}
-                          >
-                            <img
-                              src={r.avatar_url}
-                              className="w-5 h-5 rounded-full object-cover"
-                              alt={r.username}
-                            />
-                            {isMe ? "You (Host)" : `@${r.username}`}
-                          </div>
-                        );
-                      })}
+                    {/* Members */}
+                    <div>
+                      <h4 className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider mb-2">
+                        Members (
+                        {selectedHotspot.requests.filter((r: any) => r.status === "accepted").length}
+                        )
+                      </h4>
+                      <div className="flex flex-wrap gap-1.5">
+                        {selectedHotspot.requests
+                          .filter((r: any) => r.status === "accepted")
+                          .map((r: any) => {
+                            const isMe = r.user_id === myUserId;
+                            return (
+                              <div
+                                key={r.user_id}
+                                onClick={() => !isMe && handleUserClick(r.user_id, r.username, r.avatar_url)}
+                                className={`flex items-center gap-1.5 bg-zinc-100 border border-zinc-200/50 rounded-full pl-1.5 pr-3 py-1 text-[10px] font-semibold text-zinc-700 ${
+                                  !isMe ? "cursor-pointer hover:bg-zinc-200 transition-colors" : ""
+                                }`}
+                              >
+                                <img
+                                  src={r.avatar_url}
+                                  className="w-5 h-5 rounded-full object-cover"
+                                  alt={r.username}
+                                />
+                                {isMe ? "You (Host)" : `@${r.username}`}
+                              </div>
+                            );
+                          })}
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => leaveHotspot()}
+                      className="mt-2 w-full py-3.5 rounded-2xl border border-rose-200 hover:bg-rose-50 text-rose-600 text-xs font-bold transition-all flex items-center justify-center gap-1.5 active:scale-[0.98]"
+                    >
+                      <Trash2 size={13} /> Delete Hotspot Room
+                    </button>
                   </div>
-                </div>
-
-                {/* Chat */}
-                <div className="border-t border-zinc-100 pt-4">
-                  <h4 className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-                    <MessageSquare size={12} /> Live Chat
-                  </h4>
-                  <ChatRoom
-                    messages={selectedHotspot.messages}
-                    myUserId={myUserId}
-                    onSendMessage={sendMessage}
-                    userLocation={location}
-                    hotspotTitle={selectedHotspot.title}
-                  />
-                </div>
-
-                <button
-                  onClick={() => leaveHotspot()}
-                  className="mt-2 w-full py-3.5 rounded-2xl border border-rose-200 hover:bg-rose-50 text-rose-600 text-xs font-bold transition-all flex items-center justify-center gap-1.5 active:scale-[0.98]"
-                >
-                  <Trash2 size={13} /> Delete Hotspot Room
-                </button>
+                ) : (
+                  <div className="flex flex-col animate-in fade-in slide-in-from-bottom-2 duration-300">
+                    <ChatRoom
+                      messages={selectedHotspot.messages}
+                      myUserId={myUserId}
+                      onSendMessage={sendMessage}
+                      userLocation={location}
+                      hotspotTitle={selectedHotspot.title}
+                    />
+                  </div>
+                )}
               </div>
             ) : (
               <div className="mt-4 flex flex-col gap-4">
@@ -350,61 +372,80 @@ export function HotspotDrawer() {
 
                 {guestStatus === "accepted" && (
                   <div className="flex flex-col gap-4">
-                    {/* Members */}
-                    <div>
-                      <h4 className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider mb-2">
-                        Members (
-                        {
-                          selectedHotspot.requests.filter((r: any) => r.status === "accepted")
-                            .length
-                        }
-                        )
-                      </h4>
-                      <div className="flex flex-wrap gap-1.5">
-                        {selectedHotspot.requests
-                          .filter((r: any) => r.status === "accepted")
-                          .map((r: any) => {
-                            const isMe = r.user_id === myUserId;
-                            return (
-                              <div
-                                key={r.user_id}
-                                onClick={() => !isMe && handleUserClick(r.user_id, r.username, r.avatar_url)}
-                                className={`flex items-center gap-1.5 bg-zinc-100 border border-zinc-200/50 rounded-full pl-1.5 pr-3 py-1 text-[10px] font-semibold text-zinc-700 ${
-                                  !isMe ? "cursor-pointer hover:bg-zinc-200 transition-colors" : ""
-                                }`}
-                              >
-                                <img
-                                  src={r.avatar_url}
-                                  className="w-5 h-5 rounded-full object-cover"
-                                  alt={r.username}
-                                />
-                                {isMe ? "You" : `@${r.username}`}
-                              </div>
-                            );
-                          })}
+                    <div className="flex bg-zinc-100 p-1 rounded-xl">
+                      <button
+                        onClick={() => setActiveTab("info")}
+                        className={`flex-1 py-2 text-[11px] font-bold rounded-lg transition-all ${
+                          activeTab === "info" ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-500 hover:text-zinc-700"
+                        }`}
+                      >
+                        Members
+                      </button>
+                      <button
+                        onClick={() => setActiveTab("chat")}
+                        className={`flex-1 py-2 text-[11px] font-bold rounded-lg transition-all ${
+                          activeTab === "chat" ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-500 hover:text-zinc-700"
+                        }`}
+                      >
+                        Live Chat
+                      </button>
+                    </div>
+
+                    {activeTab === "info" ? (
+                      <div className="flex flex-col gap-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                        {/* Members */}
+                        <div>
+                          <h4 className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider mb-2">
+                            Members (
+                            {
+                              selectedHotspot.requests.filter((r: any) => r.status === "accepted")
+                                .length
+                            }
+                            )
+                          </h4>
+                          <div className="flex flex-wrap gap-1.5">
+                            {selectedHotspot.requests
+                              .filter((r: any) => r.status === "accepted")
+                              .map((r: any) => {
+                                const isMe = r.user_id === myUserId;
+                                return (
+                                  <div
+                                    key={r.user_id}
+                                    onClick={() => !isMe && handleUserClick(r.user_id, r.username, r.avatar_url)}
+                                    className={`flex items-center gap-1.5 bg-zinc-100 border border-zinc-200/50 rounded-full pl-1.5 pr-3 py-1 text-[10px] font-semibold text-zinc-700 ${
+                                      !isMe ? "cursor-pointer hover:bg-zinc-200 transition-colors" : ""
+                                    }`}
+                                  >
+                                    <img
+                                      src={r.avatar_url}
+                                      className="w-5 h-5 rounded-full object-cover"
+                                      alt={r.username}
+                                    />
+                                    {isMe ? "You" : `@${r.username}`}
+                                  </div>
+                                );
+                              })}
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={() => leaveHotspot()}
+                          className="mt-2 w-full py-3 rounded-2xl border border-zinc-200 text-zinc-500 hover:text-rose-600 hover:bg-rose-50/50 text-xs font-bold transition-all flex items-center justify-center gap-1.5 active:scale-[0.98]"
+                        >
+                          <LogOut size={13} /> Leave Hotspot Room
+                        </button>
                       </div>
-                    </div>
-
-                    {/* Chat */}
-                    <div className="border-t border-zinc-100 pt-4">
-                      <h4 className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-                        <MessageSquare size={12} /> Room Chat
-                      </h4>
-                      <ChatRoom
-                        messages={selectedHotspot.messages}
-                        myUserId={myUserId}
-                        onSendMessage={sendMessage}
-                        userLocation={location}
-                        hotspotTitle={selectedHotspot.title}
-                      />
-                    </div>
-
-                    <button
-                      onClick={() => leaveHotspot()}
-                      className="mt-2 w-full py-3 rounded-2xl border border-zinc-200 text-zinc-500 hover:text-rose-600 hover:bg-rose-50/50 text-xs font-bold transition-all flex items-center justify-center gap-1.5 active:scale-[0.98]"
-                    >
-                      <LogOut size={13} /> Leave Hotspot Room
-                    </button>
+                    ) : (
+                      <div className="flex flex-col animate-in fade-in slide-in-from-bottom-2 duration-300">
+                        <ChatRoom
+                          messages={selectedHotspot.messages}
+                          myUserId={myUserId}
+                          onSendMessage={sendMessage}
+                          userLocation={location}
+                          hotspotTitle={selectedHotspot.title}
+                        />
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
