@@ -189,6 +189,9 @@ export function useWebRTC({
           audioCtxRef.current = new AudioContextClass();
           listenerMixNodeRef.current = audioCtxRef.current.createMediaStreamDestination();
         }
+        if (audioCtxRef.current && audioCtxRef.current.state === "suspended") {
+          audioCtxRef.current.resume().catch(() => {});
+        }
         hostSourceRef.current = audioCtxRef.current.createMediaStreamSource(stream);
         hostSourceRef.current.connect(listenerMixNodeRef.current!);
       }

@@ -15,16 +15,32 @@ const getAudioContext = (): AudioContext | null => {
 
 // Auto-unlock AudioContext on first user interaction (critical for Android and iOS)
 if (typeof window !== "undefined") {
+  const playSilentBuffer = (ctx: AudioContext) => {
+    try {
+      const buffer = ctx.createBuffer(1, 1, 22050);
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(ctx.destination);
+      source.start(0);
+    } catch (e) {
+      console.warn("[Norby Audio] Failed to play silent buffer:", e);
+    }
+  };
+
   const unlock = () => {
     const ctx = getAudioContext();
-    if (ctx && ctx.state === "suspended") {
-      ctx.resume().then(() => {
+    if (ctx) {
+      if (ctx.state === "suspended") {
+        ctx.resume().then(() => {
+          playSilentBuffer(ctx);
+          cleanUp();
+        }).catch((err) => {
+          console.warn("[Norby Audio] Failed to unlock AudioContext:", err);
+        });
+      } else {
+        playSilentBuffer(ctx);
         cleanUp();
-      }).catch((err) => {
-        console.warn("[Norby Audio] Failed to unlock AudioContext:", err);
-      });
-    } else if (ctx && ctx.state === "running") {
-      cleanUp();
+      }
     }
   };
 
