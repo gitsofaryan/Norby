@@ -54,7 +54,7 @@ export function ActiveCallHUD() {
   if (!isRinging && !isActive) return null;
 
   return (
-    <div className="fixed top-[168px] right-4 z-[999999] flex items-center justify-end gap-2 pointer-events-none">
+    <div className="fixed top-[168px] right-4 z-[990] flex items-center justify-end gap-2 pointer-events-none">
       <AnimatePresence>
         {isExpanded && (
           <motion.div
