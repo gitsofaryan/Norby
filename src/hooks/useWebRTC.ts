@@ -42,6 +42,9 @@ export function useWebRTC({
   const [isSpaceHost, setIsSpaceHost] = useState(false);
   const [incomingStreams, setIncomingStreams] = useState<Record<string, MediaStream>>({});
   
+  // 1-to-1 Call Management
+  const [activeCallUserId, setActiveCallUserId] = useState<string | null>(null);
+  
   // Space Management states
   const [speakRequests, setSpeakRequests] = useState<SpeakRequest[]>([]);
   const [activeSpeakers, setActiveSpeakers] = useState<SpaceSpeaker[]>([]);
@@ -84,6 +87,8 @@ export function useWebRTC({
     setActiveListeners((prev) => prev.filter((l) => l.user_id !== targetUserId));
     setActiveSpeakers((prev) => prev.filter((s) => s.user_id !== targetUserId));
     setSpeakRequests((prev) => prev.filter((r) => r.user_id !== targetUserId));
+    
+    setActiveCallUserId((prev) => prev === targetUserId ? null : prev);
   }, []);
 
   const createPeerConnection = (targetUserId: string, isInitiator: boolean) => {
@@ -132,6 +137,40 @@ export function useWebRTC({
 
     peerConnectionsRef.current[targetUserId] = pc;
     return pc;
+  };
+
+  const startCall = async (targetUserId: string) => {
+    try {
+      if (!localStreamRef.current) {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        localStreamRef.current = stream;
+      }
+      setActiveCallUserId(targetUserId);
+
+      const pc = createPeerConnection(targetUserId, true);
+      
+      localStreamRef.current.getTracks().forEach((track) => {
+        pc.addTrack(track, localStreamRef.current!);
+      });
+
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      sendRtcOffer(targetUserId, offer);
+    } catch (err) {
+      console.error("[WebRTC] Failed to start call:", err);
+      alert("Microphone permission denied or not available.");
+      setActiveCallUserId(null);
+    }
+  };
+
+  const endCall = (targetUserId: string) => {
+    handlePeerDisconnect(targetUserId);
+    setActiveCallUserId(null);
+    // If not in a space broadcast, stop local mic entirely
+    if (!isBroadcastingAudio && localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach((track) => track.stop());
+      localStreamRef.current = null;
+    }
   };
 
   const startBroadcast = async (isHost = false) => {
@@ -443,6 +482,39 @@ export function useWebRTC({
       }
       return;
     }
+
+    // Handle traditional 1-to-1 WebRTC call offer
+    if (offer.type === "offer") {
+      try {
+        if (!localStreamRef.current) {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+          localStreamRef.current = stream;
+        }
+        setActiveCallUserId(sender_id);
+
+        const pc = peerConnectionsRef.current[sender_id] || createPeerConnection(sender_id, false);
+        
+        // Add local tracks to pc if they haven't been added
+        const senders = pc.getSenders();
+        if (senders.length === 0) {
+          localStreamRef.current.getTracks().forEach((track) => {
+            pc.addTrack(track, localStreamRef.current!);
+          });
+        }
+
+        await pc.setRemoteDescription(new RTCSessionDescription({
+          type: "offer",
+          sdp: offer.sdp,
+        }));
+
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        sendRtcAnswer(sender_id, { type: "answer", sdp: answer.sdp });
+      } catch (err) {
+        console.error("[WebRTC] Error handling 1-to-1 call offer:", err);
+      }
+      return;
+    }
   }, [isBroadcastingAudio, sendRtcAnswer, sendRtcOffer, handlePeerDisconnect]);
 
   const handleRtcAnswer = useCallback(async (msg: any) => {
@@ -520,6 +592,10 @@ export function useWebRTC({
     handleRtcOffer,
     handleRtcAnswer,
     handleRtcIceCandidate,
+    // 1-to-1 WebRTC Call
+    activeCallUserId,
+    startCall,
+    endCall,
     
     // Space states & methods
     speakRequests,

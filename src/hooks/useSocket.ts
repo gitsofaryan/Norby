@@ -30,6 +30,9 @@ interface UseSocketProps {
   onRtcOffer?: (data: any) => void;
   onRtcAnswer?: (data: any) => void;
   onRtcIceCandidate?: (data: any) => void;
+  onCallRequest?: (data: any) => void;
+  onCallResponse?: (data: any) => void;
+  onCallEnd?: (data: any) => void;
 }
 
 export function useSocket({
@@ -60,6 +63,9 @@ export function useSocket({
   onRtcOffer,
   onRtcAnswer,
   onRtcIceCandidate,
+  onCallRequest,
+  onCallResponse,
+  onCallEnd,
 }: UseSocketProps) {
   const [socketReady, setSocketReady] = useState(false);
   const [connectionState, setConnectionState] = useState<
@@ -92,6 +98,9 @@ export function useSocket({
     onRtcOffer,
     onRtcAnswer,
     onRtcIceCandidate,
+    onCallRequest,
+    onCallResponse,
+    onCallEnd,
   });
 
   useEffect(() => {
@@ -115,6 +124,9 @@ export function useSocket({
       onRtcOffer,
       onRtcAnswer,
       onRtcIceCandidate,
+      onCallRequest,
+      onCallResponse,
+      onCallEnd,
     };
   });
 
@@ -348,6 +360,15 @@ export function useSocket({
               break;
             case "rtc_ice_candidate":
               callbacksRef.current.onRtcIceCandidate?.(msg);
+              break;
+            case "call_request":
+              callbacksRef.current.onCallRequest?.(msg);
+              break;
+            case "call_response":
+              callbacksRef.current.onCallResponse?.(msg);
+              break;
+            case "call_end":
+              callbacksRef.current.onCallEnd?.(msg);
               break;
             default:
               break;
@@ -624,6 +645,32 @@ export function useSocket({
     });
   };
 
+  const sendCallRequest = (targetUserId: string) => {
+    return send({
+      type: "call_request",
+      target_user_id: targetUserId,
+      caller_id: userId,
+      caller_username: handle,
+      caller_avatar: avatarUrl,
+    });
+  };
+
+  const respondCallRequest = (targetUserId: string, responderId: string, status: "accepted" | "rejected") => {
+    return send({
+      type: "call_response",
+      target_user_id: targetUserId,
+      responder_id: responderId,
+      status,
+    });
+  };
+
+  const sendCallEnd = (targetUserId: string) => {
+    return send({
+      type: "call_end",
+      target_user_id: targetUserId,
+    });
+  };
+
   return {
     socketReady,
     connectionState,
@@ -645,5 +692,8 @@ export function useSocket({
     sendRtcOffer,
     sendRtcAnswer,
     sendRtcIceCandidate,
+    sendCallRequest,
+    respondCallRequest,
+    sendCallEnd,
   };
 }

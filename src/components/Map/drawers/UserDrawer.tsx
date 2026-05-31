@@ -34,6 +34,9 @@ export function UserDrawer() {
     cancelSpeakRequest,
     toggleLocalMic,
     leaveSpace,
+    initiateCall,
+    activeCallUserId,
+    callStatus,
   } = useMapContext();
 
   const { chatRequests, sendChatRequest } = useSocialContext();
@@ -260,6 +263,28 @@ export function UserDrawer() {
                 })()
               )}
 
+              {/* 1-to-1 Audio Call */}
+              {selectedUser.user_id !== myUserId && (
+                <button
+                  onClick={() => initiateCall(selectedUser.user_id)}
+                  disabled={callStatus === "ringing" || callStatus === "connected" || activeCallUserId === selectedUser.user_id}
+                  className={`w-full py-3.5 rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-sm border ${
+                    activeCallUserId === selectedUser.user_id || callStatus === "connected"
+                      ? "bg-emerald-50 text-emerald-600 border-emerald-200 cursor-not-allowed"
+                      : callStatus === "ringing"
+                      ? "bg-zinc-850 text-zinc-550 border-zinc-750 cursor-not-allowed"
+                      : "bg-zinc-900 text-white border-zinc-900 hover:bg-black active:scale-[0.98] cursor-pointer"
+                  }`}
+                >
+                  <Mic size={13} />
+                  {activeCallUserId === selectedUser.user_id || callStatus === "connected"
+                    ? "In Call"
+                    : callStatus === "ringing"
+                    ? "Calling..."
+                    : "Audio Call"}
+                </button>
+              )}
+
               {/* Connect / Chat Button */}
               {(() => {
                 if (isConnected) {
@@ -310,7 +335,7 @@ export function UserDrawer() {
                       }}
                       className="w-full py-3.5 rounded-2xl bg-zinc-900 hover:bg-black text-white text-xs font-bold transition-all flex items-center justify-center gap-1.5 active:scale-[0.98] cursor-pointer"
                     >
-                      Request to Connect 💬
+                      Request to Chat 💬
                     </button>
                   );
                 }

@@ -17,6 +17,8 @@ import { FloatingControls } from "./overlays/FloatingControls";
 import { IntentModal } from "./overlays/IntentModal";
 import { RouteHUD } from "./overlays/RouteHUD";
 import { CallOverlay } from "./CallOverlay";
+import { IncomingCallModal } from "./overlays/IncomingCallModal";
+import { ActiveCallHUD } from "./overlays/ActiveCallHUD";
 
 // private MapController component to synchronize Leaflet instance states
 function MapController({
@@ -355,7 +357,8 @@ function LiveMapContent() {
       <UserDrawer />
       <SpaceDrawer />
       <CallOverlay />
-      
+      <IncomingCallModal />
+      <ActiveCallHUD />
 
 
       {/* Toast Notifications */}

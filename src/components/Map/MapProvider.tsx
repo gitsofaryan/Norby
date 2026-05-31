@@ -7,6 +7,7 @@ import { useSocket } from "@/hooks/useSocket";
 import { useWebRTC } from "@/hooks/useWebRTC";
 import { fetchOSRMRoute, RouteData, TransportMode } from "@/lib/routing";
 import { globalEventBus } from "@/lib/eventBus";
+import { playSound } from "@/lib/sounds";
 import { ChatProvider, DirectMessage } from "./ChatProvider";
 export { SocialContext, DMContext, useSocialContext, useDMContext, type SocialContextType, type DMContextType } from "./ChatProvider";
 
@@ -109,6 +110,15 @@ interface MapContextType {
   incomingStreams: Record<string, MediaStream>;
   isSpeakerMuted: boolean;
   setIsSpeakerMuted: (muted: boolean) => void;
+
+  // 1-to-1 Calling
+  incomingCall: { caller_id: string; caller_username: string; caller_avatar?: string } | null;
+  callStatus: "ringing" | "connected" | null;
+  activeCallUserId: string | null;
+  initiateCall: (targetUserId: string) => void;
+  acceptCall: () => void;
+  rejectCall: () => void;
+  hangUp: () => void;
 
   // Space Controls
   speakRequests: any[];
@@ -282,6 +292,11 @@ export function MapProvider({ children }: { children: React.ReactNode }) {
   const [intents, setIntents] = useState<any[]>([]);
 
   // Chat states have been moved to ChatProvider
+  
+  // 1-to-1 Calling state
+  const [incomingCall, setIncomingCall] = useState<{ caller_id: string; caller_username: string; caller_avatar?: string } | null>(null);
+  const [callStatus, setCallStatus] = useState<"ringing" | "connected" | null>(null);
+  
   // Routing state
   const [activeRoute, setActiveRoute] = useState<RouteData | null>(null);
   const [activeRouteMode, setActiveRouteMode] = useState<TransportMode>("foot");
@@ -508,9 +523,11 @@ export function MapProvider({ children }: { children: React.ReactNode }) {
             messages: [...rawMsgs, msg.message],
           };
         });
+        playSound("click");
       }
     },
     onWaveReceived: (msg) => {
+      playSound("pop");
       addToast(`👋 ${msg.sender_username} waved at you!`, "wave");
       setNotifications((prev) =>
         [
@@ -531,15 +548,51 @@ export function MapProvider({ children }: { children: React.ReactNode }) {
     onUserDisconnected: (msg) => {
       setActiveUsers((prev) => prev.filter((u) => u.user_id !== msg.user_id));
     },
-    onChatRequestReceived: (msg) => globalEventBus.emit("chat:chat_request", msg),
+    onChatRequestReceived: (msg) => {
+      playSound("pop");
+      globalEventBus.emit("chat:chat_request", msg);
+    },
     onChatRequestResponded: (msg) => globalEventBus.emit("chat:chat_respond", msg),
-    onNewDirectMessage: (msg) => globalEventBus.emit("chat:new_dm", msg),
+    onNewDirectMessage: (msg) => {
+      playSound("click");
+      globalEventBus.emit("chat:new_dm", msg);
+    },
     onDMHistory: (msg) => {},
     onTypingIndicator: (msg) => globalEventBus.emit("chat:typing_indicator", msg),
     onChatsList: (msg) => globalEventBus.emit("chat:chats_list", msg),
     onRtcOffer: webRTC.handleRtcOffer,
     onRtcAnswer: webRTC.handleRtcAnswer,
     onRtcIceCandidate: webRTC.handleRtcIceCandidate,
+    onCallRequest: (msg) => {
+      if (webRTC.activeCallUserId || webRTC.isBroadcastingAudio) {
+        socketMethodsRef.current?.respondCallRequest(msg.caller_id, myUserId, "rejected");
+        return;
+      }
+      setIncomingCall({
+        caller_id: msg.caller_id,
+        caller_username: msg.caller_username,
+        caller_avatar: msg.caller_avatar,
+      });
+      playSound("ring");
+      addToast(`Incoming call from @${msg.caller_username}`, "default");
+    },
+    onCallResponse: (msg) => {
+      if (msg.status === "accepted") {
+        playSound("success");
+        setCallStatus("connected");
+        webRTC.startCall(msg.responder_id);
+      } else {
+        playSound("error");
+        setCallStatus(null);
+        addToast("Call rejected or user busy", "default");
+      }
+    },
+    onCallEnd: (msg) => {
+      setIncomingCall(null);
+      setCallStatus(null);
+      webRTC.endCall(msg.target_user_id || msg.caller_id);
+      addToast("Call ended", "default");
+    },
   });
 
   useEffect(() => {
@@ -605,7 +658,38 @@ export function MapProvider({ children }: { children: React.ReactNode }) {
     }
   }, [socket]);
 
+  const initiateCall = useCallback((targetUserId: string) => {
+    if (webRTC.isBroadcastingAudio) {
+      addToast("You cannot make a 1-to-1 call while in a Space.", "default");
+      return;
+    }
+    setCallStatus("ringing");
+    socket.sendCallRequest(targetUserId);
+  }, [socket, webRTC, addToast]);
 
+  const acceptCall = useCallback(() => {
+    if (!incomingCall) return;
+    setCallStatus("connected");
+    socket.respondCallRequest(incomingCall.caller_id, myUserId, "accepted");
+    setIncomingCall(null);
+  }, [incomingCall, socket, myUserId]);
+
+  const rejectCall = useCallback(() => {
+    if (!incomingCall) return;
+    socket.respondCallRequest(incomingCall.caller_id, myUserId, "rejected");
+    setIncomingCall(null);
+    setCallStatus(null);
+  }, [incomingCall, socket, myUserId]);
+
+  const hangUp = useCallback(() => {
+    const target = webRTC.activeCallUserId || incomingCall?.caller_id;
+    if (target) {
+      socket.sendCallEnd(target);
+      webRTC.endCall(target);
+    }
+    setIncomingCall(null);
+    setCallStatus(null);
+  }, [socket, webRTC, incomingCall]);
 
   // Deprecated - history loaded directly in main effect from localStorage
 
@@ -749,6 +833,14 @@ export function MapProvider({ children }: { children: React.ReactNode }) {
     sendMessage,
     leaveHotspot,
 
+    incomingCall,
+    callStatus,
+    activeCallUserId: webRTC.activeCallUserId,
+    initiateCall,
+    acceptCall,
+    rejectCall,
+    hangUp,
+
     isBroadcastingAudio: webRTC.isBroadcastingAudio,
     isSpaceHost: webRTC.isSpaceHost,
     startBroadcast: webRTC.startBroadcast,
@@ -830,6 +922,9 @@ export function MapProvider({ children }: { children: React.ReactNode }) {
     activeWaves,
 
     webRTC.isBroadcastingAudio,
+    webRTC.activeCallUserId,
+    incomingCall,
+    callStatus,
     webRTC.isSpaceHost,
     webRTC.incomingStreams,
     isSpeakerMuted,

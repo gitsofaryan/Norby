@@ -253,6 +253,27 @@ const RequestDMHistorySchema = z.object({
   target_user_id: z.string(),
 });
 
+// ── Call Signaling Schemas ──
+const CallRequestSchema = z.object({
+  type: z.literal("call_request"),
+  target_user_id: z.string(),
+  caller_id: z.string(),
+  caller_username: z.string(),
+  caller_avatar: z.string().optional().nullable(),
+});
+
+const CallResponseSchema = z.object({
+  type: z.literal("call_response"),
+  target_user_id: z.string(),
+  responder_id: z.string(),
+  status: z.enum(["accepted", "rejected"]),
+});
+
+const CallEndSchema = z.object({
+  type: z.literal("call_end"),
+  target_user_id: z.string(),
+});
+
 // ── WebRTC Signaling Schemas ──
 const RTCOfferSchema = z.object({
   type: z.literal("rtc_offer"),
@@ -293,6 +314,9 @@ const IncomingMessageSchema = z.discriminatedUnion("type", [
   RTCOfferSchema,
   RTCAnswerSchema,
   RTCICECandidateSchema,
+  CallRequestSchema,
+  CallResponseSchema,
+  CallEndSchema,
 ]);
 
 // ── In-Memory Fallback State (used if Redis is inactive/not configured) ──────
@@ -1720,10 +1744,15 @@ wss.on("connection", async (ws: any) => {
       } else if (
         data.type === "rtc_offer" ||
         data.type === "rtc_answer" ||
-        data.type === "rtc_ice_candidate"
+        data.type === "rtc_ice_candidate" ||
+        data.type === "call_request" ||
+        data.type === "call_response" ||
+        data.type === "call_end"
       ) {
         const { target_user_id } = data;
+        console.log(`[socket_server] Signaling message type: ${data.type} targeting user ID: ${target_user_id}`);
         if (useRedis && redisPub) {
+          console.log(`[socket_server] Publishing to Redis for target user ID: ${target_user_id}`);
           await redisPub.publish(
             "norby:direct_notifications",
             JSON.stringify({
@@ -1734,7 +1763,11 @@ wss.on("connection", async (ws: any) => {
         } else {
           const targetSocket = findLocalSocketByUserId(target_user_id);
           if (targetSocket) {
+            console.log(`[socket_server] Found local socket for target user ID: ${target_user_id}, sending message.`);
             targetSocket.send(JSON.stringify(data));
+          } else {
+            const activeUserIds = Array.from(clientsLocal.values()).map(info => info.user_id);
+            console.warn(`[socket_server] Target socket NOT found for user ID: ${target_user_id}. Active users:`, activeUserIds);
           }
         }
       }
