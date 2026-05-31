@@ -165,7 +165,7 @@ function createAvatarMarkerIcon(
   return icon;
 }
 
-export function SmoothMarker({
+export const SmoothMarker = memo(function SmoothMarker({
   position,
   icon,
   eventHandlers,
@@ -241,7 +241,7 @@ export function SmoothMarker({
       {children}
     </Marker>
   );
-}
+});
 
 interface MemoizedUserMarkerProps {
   type: "me" | "user";
@@ -351,7 +351,10 @@ const MemoizedUserMarker = memo(
       prev.rawUser?.user_id === next.rawUser?.user_id &&
       prev.rawUser?.vibeEmoji === next.rawUser?.vibeEmoji &&
       prev.rawUser?.is_broadcasting_audio === next.rawUser?.is_broadcasting_audio &&
-      prev.rawUser?.isGhostMode === next.rawUser?.isGhostMode
+      prev.rawUser?.isGhostMode === next.rawUser?.isGhostMode &&
+      prev.rawUser?.username === next.rawUser?.username &&
+      prev.rawUser?.avatar_url === next.rawUser?.avatar_url &&
+      prev.rawUser?.bio === next.rawUser?.bio
     );
   }
 );
@@ -379,18 +382,19 @@ export function UserMarker({ item }: UserMarkerProps) {
 
   // Fix Leaflet stale closure bug by saving latest parameters in a Ref
   const onClickRef = useRef<any>(null);
-  onClickRef.current = () => {
-    if ((item.type === "user" || item.type === "me") && item.raw) {
-      if (item.type === "me") {
-        if (isBroadcastingAudio) {
-          setShowSpaceDrawer(true);
+  useEffect(() => {
+    onClickRef.current = () => {
+      if ((item.type === "user" || item.type === "me") && item.raw) {
+        if (item.type === "me") {
+          if (isBroadcastingAudio) {
+            setShowSpaceDrawer(true);
+          }
+        } else {
+          setSelectedUser(item.raw);
         }
-        // Let Leaflet Popup open naturally on me marker click—do not show UserDrawer
-      } else {
-        setSelectedUser(item.raw);
       }
-    }
-  };
+    };
+  });
 
   const handleMarkerClick = useCallback(() => {
     if (onClickRef.current) {

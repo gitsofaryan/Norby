@@ -357,7 +357,7 @@ export function useWebRTC({
   };
 
   // Signaling Handlers
-  const handleRtcOffer = useCallback(async (msg: any) => {
+  const handleRtcOffer = async (msg: any) => {
     const { sender_id, offer } = msg;
     if (!offer) return;
 
@@ -518,9 +518,9 @@ export function useWebRTC({
       }
       return;
     }
-  }, [isBroadcastingAudio, sendRtcAnswer, sendRtcOffer, handlePeerDisconnect]);
+  };
 
-  const handleRtcAnswer = useCallback(async (msg: any) => {
+  const handleRtcAnswer = async (msg: any) => {
     const { sender_id, answer } = msg;
     if (!answer) return;
 
@@ -558,9 +558,9 @@ export function useWebRTC({
         console.error("[WebRTC] Error handling call answer:", err);
       }
     }
-  }, [isBroadcastingAudio]);
+  };
 
-  const handleRtcIceCandidate = useCallback(async (msg: any) => {
+  const handleRtcIceCandidate = async (msg: any) => {
     const { sender_id, candidate } = msg;
     const pc = peerConnectionsRef.current[sender_id];
     if (!pc) return;
@@ -570,14 +570,15 @@ export function useWebRTC({
     } catch (err) {
       console.error("[WebRTC] Error adding ICE candidate:", err);
     }
-  }, []);
+  };
 
   useEffect(() => {
+    const pcs = peerConnectionsRef.current;
     return () => {
       if (localStreamRef.current) {
         localStreamRef.current.getTracks().forEach(track => track.stop());
       }
-      Object.values(peerConnectionsRef.current).forEach(pc => {
+      Object.values(pcs).forEach(pc => {
         pc.oniceconnectionstatechange = null;
         pc.close();
       });

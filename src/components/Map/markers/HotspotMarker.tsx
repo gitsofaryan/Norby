@@ -1,5 +1,6 @@
 "use client";
 
+import { memo, useMemo } from "react";
 import L from "leaflet";
 import { useMapContext } from "../MapProvider";
 import { getAvatarUrl } from "@/hooks/useAuth";
@@ -215,21 +216,54 @@ interface HotspotMarkerProps {
   };
 }
 
-export function HotspotMarker({ item }: HotspotMarkerProps) {
-  const { zoom, setSelectedHotspot } = useMapContext();
-  const hotspot = item.raw;
+const MemoizedHotspotMarkerComponent = ({
+  lat, lng, zoom, hotspot, setSelectedHotspot
+}: {
+  lat: number, lng: number, zoom: number, hotspot: any, setSelectedHotspot: (h: any) => void
+}) => {
   const av = hotspot.host_avatar || getAvatarUrl(hotspot.host_username);
+  
+  const handlers = useMemo(() => ({
+    click: () => {
+      setSelectedHotspot(hotspot);
+    },
+  }), [setSelectedHotspot, hotspot]);
 
   return (
     <SmoothMarker
-      position={[item.lat, item.lng]}
+      position={[lat, lng]}
       icon={createHotspotMarkerIcon(av, hotspot.vibeEmoji || "☕", zoom, hotspot.id, hotspot.title)}
       zIndexOffset={1000}
-      eventHandlers={{
-        click: () => {
-          setSelectedHotspot(hotspot);
-        },
-      }}
+      eventHandlers={handlers}
+    />
+  );
+};
+
+const MemoizedHotspotMarker = memo(
+  MemoizedHotspotMarkerComponent,
+  (prev, next) => {
+    return (
+      prev.lat === next.lat &&
+      prev.lng === next.lng &&
+      prev.zoom === next.zoom &&
+      prev.hotspot.id === next.hotspot.id &&
+      prev.hotspot.title === next.hotspot.title &&
+      prev.hotspot.vibeEmoji === next.hotspot.vibeEmoji
+    );
+  }
+);
+
+export function HotspotMarker({ item }: HotspotMarkerProps) {
+  const { zoom, setSelectedHotspot } = useMapContext();
+  const hotspot = item.raw;
+
+  return (
+    <MemoizedHotspotMarker
+      lat={item.lat}
+      lng={item.lng}
+      zoom={zoom}
+      hotspot={hotspot}
+      setSelectedHotspot={setSelectedHotspot}
     />
   );
 }
