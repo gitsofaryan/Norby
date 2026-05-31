@@ -130,6 +130,7 @@ function LiveMapContent() {
     vibeEmoji,
     profile,
     setSelectedUser,
+    activeUsers,
   } = useMapContext();
 
   const [onboardingStep, setOnboardingStep] = useState<number | null>(null);
@@ -443,6 +444,8 @@ function LiveMapContent() {
             <VibeFilterBar />
             <FloatingControls />
             <RouteHUD />
+
+            {/* Removed Empty Map Invite Prompt as requested */}
           </motion.div>
         )}
       </AnimatePresence>

@@ -5,7 +5,17 @@ import { useMapContext } from "../MapProvider";
 import { getAvatarUrl } from "@/hooks/useAuth";
 import { getDistanceKm } from "@/hooks/useGeolocation";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, MapPin, Users, MessageSquare, Trash2, Lock, Loader2, LogOut } from "lucide-react";
+import { 
+  X, 
+  MapPin, 
+  Users, 
+  MessageSquare, 
+  Lock, 
+  Loader2, 
+  LogOut, 
+  Trash2,
+  Share
+} from "lucide-react";
 import { ChatRoom } from "./ChatRoom";
 
 export function HotspotDrawer() {
@@ -130,23 +140,55 @@ export function HotspotDrawer() {
               </button>
             </div>
 
-            {/* Directions Action */}
-            <button
-              onClick={() => {
-                if (typeof navigator !== "undefined" && navigator.vibrate) {
-                  navigator.vibrate(10);
-                }
-                setRoutingTarget({
-                  lat: selectedHotspot.lat,
-                  lng: selectedHotspot.lng,
-                  name: selectedHotspot.title,
-                });
-                setSelectedHotspot(null);
-              }}
-              className="mt-3 w-full py-3 rounded-2xl bg-zinc-900 hover:bg-black text-white text-xs font-bold transition-all flex items-center justify-center gap-1.5 active:scale-[0.98] cursor-pointer"
-            >
-              <MapPin size={13} /> Get Directions
-            </button>
+            {/* Actions */}
+            <div className="flex gap-2 mt-3">
+              <button
+                onClick={() => {
+                  if (typeof navigator !== "undefined" && navigator.vibrate) {
+                    navigator.vibrate(10);
+                  }
+                  setRoutingTarget({
+                    lat: selectedHotspot.lat,
+                    lng: selectedHotspot.lng,
+                    name: selectedHotspot.title,
+                  });
+                  setSelectedHotspot(null);
+                }}
+                className="flex-1 py-3 rounded-2xl bg-zinc-900 hover:bg-black text-white text-xs font-bold transition-all flex items-center justify-center gap-1.5 active:scale-[0.98] cursor-pointer"
+              >
+                <MapPin size={13} /> Get Directions
+              </button>
+
+              <button
+                onClick={() => {
+                  if (typeof navigator !== "undefined" && navigator.vibrate) {
+                    navigator.vibrate(10);
+                  }
+                  const dataObj = {
+                    t: selectedHotspot.title,
+                    e: selectedHotspot.vibeEmoji,
+                    h: selectedHotspot.host_username,
+                    lat: selectedHotspot.lat,
+                    lng: selectedHotspot.lng
+                  };
+                  const shortId = selectedHotspot.id.replace('room_', '');
+                  const url = `${window.location.origin}/h?id=${shortId}`;
+                  if (navigator.share) {
+                    navigator.share({
+                      title: `Join my Hotspot on Norby!`,
+                      text: `I'm hosting a hotspot on Norby. Tap to join! 🌍`,
+                      url: url
+                    }).catch(console.error);
+                  } else {
+                    navigator.clipboard.writeText(url);
+                    alert("Link copied to clipboard!");
+                  }
+                }}
+                className="px-4 py-3 rounded-2xl bg-indigo-50 text-indigo-600 hover:bg-indigo-100 border border-indigo-100 text-xs font-bold transition-all flex items-center justify-center gap-1.5 active:scale-[0.98] cursor-pointer"
+              >
+                <Share size={13} />
+              </button>
+            </div>
 
             {/* Host Profile Info */}
             {!isHost && (
