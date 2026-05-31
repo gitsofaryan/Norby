@@ -179,7 +179,7 @@ export function useOSM(
           typeof window !== "undefined" &&
           window.location.hostname === "localhost"
         ) {
-          console.warn("[norby] OSM fetch error:", err);
+          // console.warn("[norby] OSM fetch error:", err);
         }
       });
 

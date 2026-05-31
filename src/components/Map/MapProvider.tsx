@@ -452,7 +452,7 @@ export function MapProvider({ children }: { children: React.ReactNode }) {
         
         // Ignore massive outliers and normal frame variation (flag only >100ms frame updates)
         if (last && last.duration > 100 && last.duration < 1000) {
-           console.warn(`[norby metrics] Slow render detected: ${last.duration.toFixed(2)}ms for ${msg.users.length} users`);
+           // console.warn(`[norby metrics] Slow render detected: ${last.duration.toFixed(2)}ms for ${msg.users.length} users`);
         }
       });
     },
