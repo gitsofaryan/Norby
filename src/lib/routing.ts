@@ -32,10 +32,27 @@ export async function fetchOSRMRoute(
   // Swap OSRM [lng, lat] coordinates to Leaflet [lat, lng]
   const coordinates = geojsonCoords.map(([lng, lat]) => [lat, lng] as [number, number]);
 
+  // The public OSRM demo server only properly supports the 'driving' profile.
+  // It returns the driving route and duration even if we request 'foot' or 'bicycle'.
+  // To provide realistic ETAs, we manually recalculate duration based on average speeds:
+  // Foot: ~5 km/h (1.38 m/s)
+  // Bicycle: ~15 km/h (4.16 m/s)
+  let durationSeconds = route.duration;
+  let distanceMeters = route.distance;
+
+  if (mode === "foot") {
+    durationSeconds = distanceMeters / 1.38;
+    // Walking paths are often slightly more direct than driving roads
+    distanceMeters = distanceMeters * 0.95;
+  } else if (mode === "bicycle") {
+    durationSeconds = distanceMeters / 4.16;
+    distanceMeters = distanceMeters * 0.98;
+  }
+
   return {
     coordinates,
-    distanceMeters: route.distance,
-    durationSeconds: route.duration,
+    distanceMeters,
+    durationSeconds,
   };
 }
 
