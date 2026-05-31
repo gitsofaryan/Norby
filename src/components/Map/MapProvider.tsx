@@ -463,18 +463,20 @@ export function MapProvider({ children }: { children: React.ReactNode }) {
           const filtered = prev.filter((u) => u.user_id !== msg.data.user_id);
 
           if (!existingUser) {
-            playSound("nearby");
-            setNotifications((prevNotifs) =>
-              [
-                {
-                  id: Math.random().toString(36).substring(7),
-                  text: `@${msg.data.username} is now nearby`,
-                  time: Date.now(),
-                  read: false,
-                },
-                ...prevNotifs,
-              ].slice(0, 5)
-            );
+            if (!msg.data.isGhostMode) {
+              playSound("nearby");
+              setNotifications((prevNotifs) =>
+                [
+                  {
+                    id: Math.random().toString(36).substring(7),
+                    text: `@${msg.data.username} is now nearby`,
+                    time: Date.now(),
+                    read: false,
+                  },
+                  ...prevNotifs,
+                ].slice(0, 5)
+              );
+            }
           } else if (!existingUser.is_broadcasting_audio && msg.data.is_broadcasting_audio) {
             const isFriend = true; // Everyone nearby who speaks triggers it
             if (isFriend) {
@@ -613,7 +615,7 @@ export function MapProvider({ children }: { children: React.ReactNode }) {
     onRtcAnswer: webRTC.handleRtcAnswer,
     onRtcIceCandidate: webRTC.handleRtcIceCandidate,
     onCallRequest: (msg) => {
-      if (webRTC.activeCallUserId || webRTC.isBroadcastingAudio) {
+      if (webRTC.activeCallUserId || webRTC.isBroadcastingAudio || profile?.isGhostMode) {
         socketMethodsRef.current?.respondCallRequest(msg.caller_id, myUserId, "rejected");
         return;
       }

@@ -28,7 +28,8 @@ function createAvatarMarkerIconRaw(
   zoom: number,
   userId: string = "default",
   isWaving: boolean = false,
-  isBroadcasting: boolean = false
+  isBroadcasting: boolean = false,
+  isGhostMode: boolean = false
 ) {
   const baseSize = isMe ? 48 : 44;
   const scale = Math.max(0.3, Math.min(1.4, Math.pow(1.15, zoom - 15)));
@@ -56,11 +57,17 @@ function createAvatarMarkerIconRaw(
           background: #ffffff;
           cursor: pointer;
         ">
-          <img
-            src="${avatarUrl}"
-            style="width:100%; height:100%; object-fit:cover;"
-            onerror="this.style.display='none'"
-          />
+          ${isGhostMode ? `
+            <div style="width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-size:${Math.round(24 * scale)}px; background:#f4f4f5;">
+              👻
+            </div>
+          ` : `
+            <img
+              src="${avatarUrl}"
+              style="width:100%; height:100%; object-fit:cover;"
+              onerror="this.style.display='none'"
+            />
+          `}
         </div>
         <div style="
           position:absolute; bottom:-2px; right:-2px;
@@ -135,11 +142,12 @@ function createAvatarMarkerIcon(
   zoom: number,
   userId: string = "default",
   isWaving: boolean = false,
-  isBroadcasting: boolean = false
+  isBroadcasting: boolean = false,
+  isGhostMode: boolean = false
 ) {
   // Round zoom to nearest integer to reduce cache key proliferation during smooth zoom
   const roundedZoom = Math.round(zoom);
-  const key = `${userId}_${avatarUrl}_${vibeEmoji}_${isMe ? "me" : "them"}_${roundedZoom}_${isWaving ? "waving" : "static"}_${isBroadcasting ? "mic" : "nomic"}`;
+  const key = `${userId}_${avatarUrl}_${vibeEmoji}_${isMe ? "me" : "them"}_${roundedZoom}_${isWaving ? "waving" : "static"}_${isBroadcasting ? "mic" : "nomic"}_${isGhostMode ? "ghost" : "noghost"}`;
   if (avatarIconCache.has(key)) {
     // LRU: move to end by re-inserting
     const icon = avatarIconCache.get(key)!;
@@ -152,7 +160,7 @@ function createAvatarMarkerIcon(
     const keysToDelete = Array.from(avatarIconCache.keys()).slice(0, 150);
     keysToDelete.forEach((k) => avatarIconCache.delete(k));
   }
-  const icon = createAvatarMarkerIconRaw(avatarUrl, vibeEmoji, isMe, roundedZoom, userId, isWaving, isBroadcasting);
+  const icon = createAvatarMarkerIconRaw(avatarUrl, vibeEmoji, isMe, roundedZoom, userId, isWaving, isBroadcasting, isGhostMode);
   avatarIconCache.set(key, icon);
   return icon;
 }
@@ -245,6 +253,7 @@ interface MemoizedUserMarkerProps {
   myUserId: string;
   isWaving: boolean;
   isBroadcasting: boolean;
+  isGhostMode: boolean;
   rawUser?: any;
   onClick?: () => void;
 }
@@ -259,6 +268,7 @@ const MemoizedUserMarkerComponent = ({
   myUserId,
   isWaving,
   isBroadcasting,
+  isGhostMode,
   rawUser,
   onClick,
 }: MemoizedUserMarkerProps) => {
@@ -315,7 +325,7 @@ const MemoizedUserMarkerComponent = ({
   return (
     <SmoothMarker
       position={[lat, lng]}
-      icon={createAvatarMarkerIcon(av, rawUser.vibeEmoji || "🙂", false, zoom, rawUser.user_id, isWaving, isBroadcasting)}
+      icon={createAvatarMarkerIcon(av, rawUser.vibeEmoji || "🙂", false, zoom, rawUser.user_id, isWaving, isBroadcasting, isGhostMode)}
       zIndexOffset={500}
       eventHandlers={{
         click: onClick,
@@ -337,9 +347,11 @@ const MemoizedUserMarker = memo(
       prev.myUserId === next.myUserId &&
       prev.isWaving === next.isWaving &&
       prev.isBroadcasting === next.isBroadcasting &&
+      prev.isGhostMode === next.isGhostMode &&
       prev.rawUser?.user_id === next.rawUser?.user_id &&
       prev.rawUser?.vibeEmoji === next.rawUser?.vibeEmoji &&
-      prev.rawUser?.is_broadcasting_audio === next.rawUser?.is_broadcasting_audio
+      prev.rawUser?.is_broadcasting_audio === next.rawUser?.is_broadcasting_audio &&
+      prev.rawUser?.isGhostMode === next.rawUser?.isGhostMode
     );
   }
 );
@@ -363,6 +375,7 @@ export function UserMarker({ item }: UserMarkerProps) {
   const isBroadcasting = item.type === "me" 
     ? isBroadcastingAudio 
     : !!item.raw?.is_broadcasting_audio;
+  const isGhostMode = !!item.raw?.isGhostMode;
 
   // Fix Leaflet stale closure bug by saving latest parameters in a Ref
   const onClickRef = useRef<any>(null);
@@ -396,6 +409,7 @@ export function UserMarker({ item }: UserMarkerProps) {
       myUserId={myUserId}
       isWaving={isWaving}
       isBroadcasting={isBroadcasting}
+      isGhostMode={isGhostMode}
       rawUser={item.raw}
       onClick={handleMarkerClick}
     />

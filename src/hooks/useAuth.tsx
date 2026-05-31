@@ -23,6 +23,7 @@ export type UserProfile = {
   gender: "Male" | "Female" | "Non-binary" | "Prefer not to say" | "";
   age: number | "";
   blockedUsers: string[];
+  isGhostMode?: boolean;
 };
 
 type AuthContextType = {
@@ -116,6 +117,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           gender: "",
           age: "",
           blockedUsers: [],
+          isGhostMode: false,
         };
         setProfile(defaultProfile);
         await window.puter.kv.set(`profile_v2_${u.username}`, JSON.stringify(defaultProfile));

@@ -85,21 +85,29 @@ export function UserDrawer() {
             <div className="flex justify-between items-start gap-3 border-b border-zinc-100 pb-4">
               <div className="flex items-center gap-3">
                 <div className="relative">
-                  <img
-                    src={selectedUser.avatar_url || getAvatarUrl(selectedUser.username)}
-                    className="w-14 h-14 rounded-full object-cover border border-zinc-100 bg-zinc-50"
-                    alt={selectedUser.username}
-                  />
+                  {selectedUser.isGhostMode ? (
+                    <div className="w-14 h-14 rounded-full border border-zinc-100 bg-zinc-100 flex items-center justify-center text-2xl">
+                      👻
+                    </div>
+                  ) : (
+                    <img
+                      src={selectedUser.avatar_url || getAvatarUrl(selectedUser.username)}
+                      className="w-14 h-14 rounded-full object-cover border border-zinc-100 bg-zinc-50"
+                      alt={selectedUser.username}
+                    />
+                  )}
                   <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-white border border-zinc-200 rounded-full flex items-center justify-center text-sm shadow-sm">
                     {selectedUser.vibeEmoji || "🙂"}
                   </div>
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-zinc-900 leading-tight">
-                    {selectedUser.username}
+                    {selectedUser.isGhostMode ? "Ghost User" : selectedUser.username}
                   </h3>
                   <p className="text-[10px] text-zinc-400 font-semibold mt-0.5">
-                    {selectedUser.age ? `${selectedUser.age} y/o` : "Age not shared"} · {selectedUser.gender || "Gender not shared"}
+                    {selectedUser.isGhostMode ? "Information hidden" : (
+                      <>{selectedUser.age ? `${selectedUser.age} y/o` : "Age not shared"} · {selectedUser.gender || "Gender not shared"}</>
+                    )}
                   </p>
                   <p className="text-[10px] text-zinc-500 mt-1 flex items-center gap-1 font-bold">
                     <MapPin size={10} className="text-zinc-400" />
@@ -123,13 +131,13 @@ export function UserDrawer() {
             {/* Tagline / Bio */}
             <div className="space-y-1.5">
               <h4 className="text-[10px] font-bold tracking-widest uppercase text-zinc-400">Tagline</h4>
-              <p className="text-xs text-zinc-700 leading-relaxed font-medium bg-zinc-50 rounded-2xl p-4 border border-zinc-100">
-                {selectedUser.bio || "No tagline set."}
+              <p className={`text-xs leading-relaxed font-medium bg-zinc-50 rounded-2xl p-4 border border-zinc-100 ${selectedUser.isGhostMode ? 'text-zinc-400 italic' : 'text-zinc-700'}`}>
+                {selectedUser.isGhostMode ? "User is currently in Ghost Mode. 👻" : (selectedUser.bio || "No tagline set.")}
               </p>
             </div>
 
             {/* Interests / Tags */}
-            {selectedUser.selectedTags && selectedUser.selectedTags.length > 0 && (
+            {!selectedUser.isGhostMode && selectedUser.selectedTags && selectedUser.selectedTags.length > 0 && (
               <div className="space-y-2">
                 <h4 className="text-[10px] font-bold tracking-widest uppercase text-zinc-400">Interests</h4>
                 <div className="flex flex-wrap gap-1.5">
@@ -264,7 +272,7 @@ export function UserDrawer() {
               )}
 
               {/* 1-to-1 Audio Call */}
-              {selectedUser.user_id !== myUserId && (
+              {!selectedUser.isGhostMode && selectedUser.user_id !== myUserId && (
                 <button
                   onClick={() => initiateCall(selectedUser.user_id)}
                   disabled={callStatus === "ringing" || callStatus === "connected" || activeCallUserId === selectedUser.user_id}
@@ -286,7 +294,7 @@ export function UserDrawer() {
               )}
 
               {/* Connect / Chat Button */}
-              {(() => {
+              {!selectedUser.isGhostMode && (() => {
                 if (isConnected) {
                   return (
                     <button
@@ -341,36 +349,59 @@ export function UserDrawer() {
                 }
               })()}
 
-              <div className="flex gap-3">
-                <button
-                  onClick={() => {
-                    if (confirmBlock) {
-                      handleBlock(selectedUser.user_id);
-                    } else {
-                      setConfirmBlock(true);
-                    }
-                  }}
-                  className={`flex-1 py-3.5 rounded-2xl border text-xs font-bold transition-all flex items-center justify-center gap-1.5 active:scale-[0.98] ${
-                    confirmBlock
-                      ? "border-rose-600 bg-rose-600 text-white hover:bg-rose-700"
-                      : "border-rose-200 hover:bg-rose-50 text-rose-600"
-                  }`}
-                >
-                  {confirmBlock ? "Confirm Block?" : "Block / Report"}
-                </button>
+              {!selectedUser.isGhostMode && (
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => {
+                      if (confirmBlock) {
+                        handleBlock(selectedUser.user_id);
+                      } else {
+                        setConfirmBlock(true);
+                      }
+                    }}
+                    className={`flex-1 py-3.5 rounded-2xl border text-xs font-bold transition-all flex items-center justify-center gap-1.5 active:scale-[0.98] ${
+                      confirmBlock
+                        ? "border-rose-600 bg-rose-600 text-white hover:bg-rose-700"
+                        : "border-rose-200 hover:bg-rose-50 text-rose-600"
+                    }`}
+                  >
+                    {confirmBlock ? "Confirm Block?" : "Block / Report"}
+                  </button>
 
-                <button
-                  onClick={handleWave}
-                  disabled={hasWaved}
-                  className={`flex-1 py-3.5 rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-                    hasWaved
-                      ? "bg-emerald-500 text-white"
-                      : "bg-zinc-900 text-white hover:bg-black active:scale-[0.98]"
-                  }`}
-                >
-                  {hasWaved ? "Waved! 👋" : "Wave 👋"}
-                </button>
-              </div>
+                  <button
+                    onClick={handleWave}
+                    disabled={hasWaved}
+                    className={`flex-1 py-3.5 rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                      hasWaved
+                        ? "bg-emerald-500 text-white"
+                        : "bg-zinc-900 text-white hover:bg-black active:scale-[0.98]"
+                    }`}
+                  >
+                    {hasWaved ? "Waved! 👋" : "Wave 👋"}
+                  </button>
+                </div>
+              )}
+              
+              {selectedUser.isGhostMode && (
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => {
+                      if (confirmBlock) {
+                        handleBlock(selectedUser.user_id);
+                      } else {
+                        setConfirmBlock(true);
+                      }
+                    }}
+                    className={`flex-1 py-3.5 rounded-2xl border text-xs font-bold transition-all flex items-center justify-center gap-1.5 active:scale-[0.98] ${
+                      confirmBlock
+                        ? "border-rose-600 bg-rose-600 text-white hover:bg-rose-700"
+                        : "border-rose-200 hover:bg-rose-50 text-rose-600"
+                    }`}
+                  >
+                    {confirmBlock ? "Confirm Block?" : "Block / Report"}
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </motion.div>

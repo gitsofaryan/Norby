@@ -81,6 +81,7 @@ interface ClientInfo {
   radarRange?: number;
   hotspotRange?: number;
   is_broadcasting_audio?: boolean;
+  isGhostMode?: boolean;
 }
 
 interface Message {
@@ -160,6 +161,7 @@ const LocationUpdateSchema = z.object({
   radarRange: z.number().optional().nullable(),
   hotspotRange: z.number().optional().nullable(),
   is_broadcasting_audio: z.boolean().optional().nullable(),
+  isGhostMode: z.boolean().optional().nullable(),
 });
 
 const CreateHotspotSchema = z.object({
@@ -881,6 +883,7 @@ wss.on("connection", async (ws: any) => {
               ? data.hotspotRange
               : (existing?.hotspotRange || 15),
           is_broadcasting_audio: data.is_broadcasting_audio !== undefined ? !!data.is_broadcasting_audio : (existing?.is_broadcasting_audio || false),
+          isGhostMode: data.isGhostMode !== undefined ? !!data.isGhostMode : (existing?.isGhostMode || false),
         };
 
         clientsLocal.set(ws, info);

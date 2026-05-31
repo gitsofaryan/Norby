@@ -204,6 +204,7 @@ export function useSocket({
           radarRange: vals.profile?.radarRange || 15,
           hotspotRange: vals.profile?.hotspotRange || 15,
           is_broadcasting_audio: !!vals.isBroadcastingAudio,
+          isGhostMode: !!vals.profile?.isGhostMode,
         })
       );
     } else {
@@ -219,6 +220,7 @@ export function useSocket({
           lat: vals.location.lat,
           lng: vals.location.lng,
           is_broadcasting_audio: !!vals.isBroadcastingAudio,
+          isGhostMode: !!vals.profile?.isGhostMode,
         })
       );
     }
@@ -448,6 +450,7 @@ export function useSocket({
     localBlocks,
     profile?.radarRange,
     profile?.hotspotRange,
+    profile?.isGhostMode,
     isBroadcastingAudio,
   ]);
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useAuth, getAvatarUrl } from "@/hooks/useAuth";
-import { LogIn, LogOut, Loader2, Shield, X, Sparkles, Shuffle, Check, Upload, ChevronRight, Volume2, HelpCircle } from "lucide-react";
+import { LogIn, LogOut, Loader2, Shield, X, Sparkles, Shuffle, Check, Upload, ChevronRight, Volume2, HelpCircle, Ghost } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
@@ -77,6 +77,7 @@ export default function ProfilePage() {
   const [hotspotRange, setHotspotRange] = useState(15);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [maskLocation, setMaskLocation] = useState(true);
+  const [isGhostMode, setIsGhostMode] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState("");
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -240,6 +241,7 @@ export default function ProfilePage() {
       setHotspotRange(profile.hotspotRange || 15);
       setSelectedTags(profile.selectedTags);
       setMaskLocation(profile.maskLocation);
+      setIsGhostMode(!!profile.isGhostMode);
       setAvatarUrl(profile.avatar_url || getAvatarUrl(profile.username));
       setGender(profile.gender || "");
       setAge(profile.age || "");
@@ -260,7 +262,7 @@ export default function ProfilePage() {
     if (age === "" || isNaN(Number(age)) || Number(age) <= 0) { setError("Please enter a valid age."); return; }
     setIsSaving(true);
     try {
-      await saveProfile({ handle, bio, vibeEmoji, radarRange, hotspotRange, bannerGradient: gradientIdx, selectedTags, maskLocation, avatar_url: avatarUrl, gender, age: Number(age) });
+      await saveProfile({ handle, bio, vibeEmoji, radarRange, hotspotRange, bannerGradient: gradientIdx, selectedTags, maskLocation, isGhostMode, avatar_url: avatarUrl, gender, age: Number(age) });
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 2500);
     } catch (e) {
@@ -643,6 +645,26 @@ export default function ProfilePage() {
             className={`w-11 h-6 rounded-full p-0.5 transition-colors shrink-0 ${muteSounds ? "bg-zinc-200" : "bg-zinc-900"}`}
           >
             <div className={`w-5 h-5 rounded-full bg-white shadow transition-transform ${muteSounds ? "translate-x-0" : "translate-x-5"}`} />
+          </button>
+        </div>
+
+        {/* Ghost Mode */}
+        <div className="px-4 py-3 flex items-center justify-between gap-3 border-b border-zinc-50">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-zinc-100 flex items-center justify-center shrink-0">
+              <Ghost size={14} className="text-zinc-500" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-zinc-800">Ghost Mode</p>
+              <p className="text-[9px] text-zinc-400 leading-relaxed">Hide profile and block incoming calls</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsGhostMode(!isGhostMode)}
+            className={`w-11 h-6 rounded-full p-0.5 transition-colors shrink-0 ${!isGhostMode ? "bg-zinc-200" : "bg-zinc-900"}`}
+          >
+            <div className={`w-5 h-5 rounded-full bg-white shadow transition-transform ${!isGhostMode ? "translate-x-0" : "translate-x-5"}`} />
           </button>
         </div>
 
