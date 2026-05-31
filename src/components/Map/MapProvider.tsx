@@ -82,7 +82,7 @@ interface MapContextType {
   requestJoin: (roomId?: any) => void;
   respondRequest: (guestId: string, status: "accepted" | "declined") => void;
   sendMessage: (text: string) => void;
-  leaveHotspot: () => void;
+  leaveHotspot: (roomId?: string) => void;
 
   // Filtered lists
   filteredUsers: any[];
@@ -596,10 +596,13 @@ export function MapProvider({ children }: { children: React.ReactNode }) {
     });
   }, [socket, addToast]);
 
-  const leaveHotspot = useCallback(() => {
-    if (!selectedHotspotRef.current) return;
-    socket.leaveHotspot(selectedHotspotRef.current.id);
-    setSelectedHotspot(null);
+  const leaveHotspot = useCallback((roomId?: string) => {
+    const id = roomId || selectedHotspotRef.current?.id;
+    if (!id) return;
+    socket.leaveHotspot(id);
+    if (selectedHotspotRef.current?.id === id) {
+      setSelectedHotspot(null);
+    }
   }, [socket]);
 
 

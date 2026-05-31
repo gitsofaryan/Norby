@@ -1601,40 +1601,9 @@ wss.on("connection", async (ws: any) => {
         const senderInfo = clientsLocal.get(ws);
         if (!senderInfo) return;
 
-        const keyA = `${senderInfo.user_id}:${recipient_id}`;
-        const keyB = `${recipient_id}:${senderInfo.user_id}`;
-        let requestA: ChatRequest | null = null;
-        let requestB: ChatRequest | null = null;
-
-        if (useRedis && redisPub) {
-          const rawA = await redisPub.zRange(`norby:chat_reqs:${senderInfo.user_id}`, 0, -1);
-          const parsedA = rawA.map(r => JSON.parse(r) as ChatRequest);
-          requestA = parsedA.find(r => `${r.sender_id}:${r.target_id}` === keyA) || null;
-          requestB = parsedA.find(r => `${r.sender_id}:${r.target_id}` === keyB) || null;
-        } else {
-          requestA = chatRequestsLocal.get(keyA) || null;
-          requestB = chatRequestsLocal.get(keyB) || null;
-        }
-
-        // NOTE: Acceptable race window exists if user A sends a DM at the exact moment user B rejects the chat request.
-        const isFriend =
-          (requestA && requestA.status === "accepted") ||
-          (requestB && requestB.status === "accepted");
-
-        if (!isFriend) {
-          logEvent("send_dm_blocked_not_friends", {
-            sender_id: senderInfo.user_id,
-            recipient_id,
-          });
-          ws.send(
-            JSON.stringify({
-              type: "error",
-              message:
-                "Cannot send direct message. You must be connected first.",
-            }),
-          );
-          return;
-        }
+        // Note: Friendship state is now managed client-side via decentralized Puter KV.
+        // The server acts as a dumb relay for direct messages, leaving permission 
+        // enforcement to the clients.
 
         const msgId = `dm_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
         const directMsg: DirectMessage = {

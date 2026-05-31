@@ -36,7 +36,19 @@ export function IntentModal({ osmPlaces = [] }: { osmPlaces?: OSMPlace[] }) {
     setCustomHotspotRange,
     postIntent,
     socketReady,
+    filteredHotspots,
+    myUserId,
+    leaveHotspot,
   } = useMapContext();
+
+  const myActiveHotspot = filteredHotspots?.find((h: any) => h.host_id === myUserId);
+
+  const handleDeleteHotspot = () => {
+    if (myActiveHotspot) {
+      leaveHotspot(myActiveHotspot.id);
+      setShowIntentModal(false);
+    }
+  };
 
   const handleCreateClick = () => {
     const place = osmPlaces.find((p) => p.id === selectedPlaceId);
@@ -69,7 +81,9 @@ export function IntentModal({ osmPlaces = [] }: { osmPlaces?: OSMPlace[] }) {
 
             <div className="px-5 pt-2 pb-8">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-bold text-zinc-900">Post Intent</h3>
+                <h3 className="text-lg font-bold text-zinc-900">
+                  {myActiveHotspot ? "Active Hotspot" : "Post Intent"}
+                </h3>
                 <button
                   onClick={() => setShowIntentModal(false)}
                   className="p-1.5 rounded-full bg-zinc-100 text-zinc-500 hover:bg-zinc-200 transition-colors cursor-pointer"
@@ -78,11 +92,37 @@ export function IntentModal({ osmPlaces = [] }: { osmPlaces?: OSMPlace[] }) {
                 </button>
               </div>
 
-              <p className="text-xs text-zinc-400 mb-4 leading-relaxed">
-                Post what you are doing. Adjust the slider below to control how far away (10km - 30km) others can be to see your hotspot on their map.
-              </p>
+              {myActiveHotspot ? (
+                <div className="flex flex-col gap-4">
+                  <div className="p-4 rounded-xl bg-zinc-50 border border-zinc-200">
+                    <h4 className="text-sm font-bold text-zinc-900 mb-1">{myActiveHotspot.title}</h4>
+                    <p className="text-xs text-zinc-500">
+                      You already have an active hotspot. You can only have one active hotspot at a time.
+                      Delete it to create a new one.
+                    </p>
+                  </div>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => setShowIntentModal(false)}
+                      className="flex-1 py-3.5 rounded-xl bg-zinc-100 text-zinc-600 font-semibold text-sm hover:bg-zinc-200 transition-colors cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleDeleteHotspot}
+                      className="flex-1 py-3.5 rounded-xl bg-red-50 text-red-600 font-bold text-sm hover:bg-red-100 transition-colors cursor-pointer"
+                    >
+                      Delete Hotspot
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <p className="text-xs text-zinc-400 mb-4 leading-relaxed">
+                    Post what you are doing. Adjust the slider below to control how far away (10km - 30km) others can be to see your hotspot on their map.
+                  </p>
 
-              {/* Suggestions */}
+                  {/* Suggestions */}
               <div className="flex flex-wrap gap-2 mb-4 max-h-[120px] overflow-y-auto scrollbar-none [&::-webkit-scrollbar]:hidden">
                 {INTENT_SUGGESTIONS.map((s) => (
                   <button
@@ -187,8 +227,10 @@ export function IntentModal({ osmPlaces = [] }: { osmPlaces?: OSMPlace[] }) {
                   Create Hotspot
                 </button>
               </div>
-            </div>
-          </motion.div>
+            </>
+          )}
+        </div>
+      </motion.div>
         </motion.div>
       )}
     </AnimatePresence>
