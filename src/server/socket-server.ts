@@ -1440,8 +1440,10 @@ wss.on("connection", async (ws: any) => {
       } else if (data.type === "send_wave") {
         const { target_user_id, sender_id, sender_username } = data;
         logEvent("wave_sent", { target_user_id, sender_id, sender_username });
+        console.log(`[socket_server] Wave sent from @${sender_username} (${sender_id}) targeting: ${target_user_id}`);
 
         if (useRedis && redisPub) {
+          console.log(`[socket_server] Publishing wave to Redis for: ${target_user_id}`);
           await redisPub.publish(
             "norby:direct_notifications",
             JSON.stringify({
@@ -1456,6 +1458,7 @@ wss.on("connection", async (ws: any) => {
         } else {
           const targetSocket = findLocalSocketByUserId(target_user_id);
           if (targetSocket) {
+            console.log(`[socket_server] Wave forwarded to active socket for target user ID: ${target_user_id}`);
             targetSocket.send(
               JSON.stringify({
                 type: "wave_received",
@@ -1463,6 +1466,8 @@ wss.on("connection", async (ws: any) => {
                 sender_username,
               }),
             );
+          } else {
+            console.warn(`[socket_server] Wave target socket NOT found for user ID: ${target_user_id}`);
           }
         }
       } else if (data.type === "send_chat_request") {

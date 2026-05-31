@@ -72,12 +72,12 @@ function FloatingControlsInner() {
         <AnimatePresence>
           {showNotifDropdown && (
             <>
-              <div className="fixed inset-0 z-[-1]" onClick={() => setShowNotifDropdown(false)} />
+              <div className="fixed inset-0 z-[900] bg-transparent cursor-default pointer-events-auto" onClick={() => setShowNotifDropdown(false)} />
               <motion.div
                 initial={{ opacity: 0, y: 10, scale: 0.95 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                className="absolute right-0 mt-2 w-64 bg-white rounded-2xl border border-zinc-200 shadow-xl overflow-hidden"
+                className="absolute right-0 mt-2 w-64 bg-white rounded-2xl border border-zinc-200 shadow-xl overflow-hidden z-[910]"
               >
                 <div className="px-4 py-3 border-b border-zinc-100 flex justify-between items-center">
                   <span className="text-xs font-bold text-zinc-900 uppercase tracking-tight">

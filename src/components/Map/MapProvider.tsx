@@ -296,6 +296,7 @@ export function MapProvider({ children }: { children: React.ReactNode }) {
   // 1-to-1 Calling state
   const [incomingCall, setIncomingCall] = useState<{ caller_id: string; caller_username: string; caller_avatar?: string } | null>(null);
   const [callStatus, setCallStatus] = useState<"ringing" | "connected" | null>(null);
+  const [outgoingCallUserId, setOutgoingCallUserId] = useState<string | null>(null);
   
   // Routing state
   const [activeRoute, setActiveRoute] = useState<RouteData | null>(null);
@@ -397,6 +398,31 @@ export function MapProvider({ children }: { children: React.ReactNode }) {
     }
   }, [webRTC.isBroadcastingAudio, webRTC.isSpaceHost]);
 
+  // Detect newly created hotspots nearby
+  const prevIntentsRef = useRef<any[]>([]);
+  useEffect(() => {
+    if (prevIntentsRef.current.length > 0 && intents.length > prevIntentsRef.current.length) {
+      const prevIds = new Set(prevIntentsRef.current.map(h => h.id));
+      const newHotspots = intents.filter(h => !prevIds.has(h.id));
+      newHotspots.forEach(h => {
+        if (h.host_id !== myUserId) {
+          playSound("broadcast");
+          addToast(`🔥 New hotspot "${h.title}" created nearby!`, "default");
+          setNotifications((prev) => [
+            {
+              id: Math.random().toString(36).substring(7),
+              text: `🔥 New hotspot "${h.title}" created nearby`,
+              time: Date.now(),
+              read: false,
+            },
+            ...prev,
+          ].slice(0, 5));
+        }
+      });
+    }
+    prevIntentsRef.current = intents;
+  }, [intents, myUserId, addToast, setNotifications]);
+
   // Socket
   const socket = useSocket({
     userId: myUserId,
@@ -437,6 +463,7 @@ export function MapProvider({ children }: { children: React.ReactNode }) {
           const filtered = prev.filter((u) => u.user_id !== msg.data.user_id);
 
           if (!existingUser) {
+            playSound("nearby");
             setNotifications((prevNotifs) =>
               [
                 {
@@ -451,6 +478,7 @@ export function MapProvider({ children }: { children: React.ReactNode }) {
           } else if (!existingUser.is_broadcasting_audio && msg.data.is_broadcasting_audio) {
             const isFriend = true; // Everyone nearby who speaks triggers it
             if (isFriend) {
+              playSound("broadcast");
               addToast(`🎙️ @${msg.data.username} is speaking nearby!`, "default");
               setNotifications((prevNotifs) =>
                 [
@@ -484,6 +512,7 @@ export function MapProvider({ children }: { children: React.ReactNode }) {
       setSelectedHotspot(msg.hotspot);
     },
     onJoinRequestReceived: (msg) => {
+      playSound("pop");
       setNotifications((prev) =>
         [
           {
@@ -500,6 +529,26 @@ export function MapProvider({ children }: { children: React.ReactNode }) {
       }
     },
     onJoinResponse: (msg) => {
+      const isAccepted = msg.status === "accepted";
+      playSound(isAccepted ? "success" : "error");
+      addToast(
+        isAccepted
+          ? `✅ Your request to join hotspot was accepted!`
+          : `❌ Your request to join hotspot was declined.`,
+        "default"
+      );
+      setNotifications((prev) => [
+        {
+          id: Math.random().toString(36).substring(7),
+          text: isAccepted
+            ? `✅ Request to join hotspot accepted`
+            : `❌ Request to join hotspot declined`,
+          time: Date.now(),
+          read: false,
+        },
+        ...prev,
+      ].slice(0, 5));
+
       if (selectedHotspotRef.current && selectedHotspotRef.current.id === msg.roomId) {
         setSelectedHotspot(msg.hotspot);
       }
@@ -527,7 +576,7 @@ export function MapProvider({ children }: { children: React.ReactNode }) {
       }
     },
     onWaveReceived: (msg) => {
-      playSound("pop");
+      playSound("wave");
       addToast(`👋 ${msg.sender_username} waved at you!`, "wave");
       setNotifications((prev) =>
         [
@@ -575,22 +624,58 @@ export function MapProvider({ children }: { children: React.ReactNode }) {
       });
       playSound("ring");
       addToast(`Incoming call from @${msg.caller_username}`, "default");
+      setNotifications((prev) => [
+        {
+          id: Math.random().toString(36).substring(7),
+          text: `📞 Incoming call from @${msg.caller_username}`,
+          time: Date.now(),
+          read: false,
+        },
+        ...prev,
+      ].slice(0, 5));
     },
     onCallResponse: (msg) => {
-      if (msg.status === "accepted") {
-        playSound("success");
+      const isAccepted = msg.status === "accepted";
+      const otherInfo = activeUsers.find((u) => u.user_id === msg.responder_id);
+      const otherHandle = otherInfo?.username || "user";
+      
+      setNotifications((prev) => [
+        {
+          id: Math.random().toString(36).substring(7),
+          text: isAccepted
+            ? `📞 Call with @${otherHandle} connected`
+            : `📞 Call request to @${otherHandle} rejected`,
+          time: Date.now(),
+          read: false,
+        },
+        ...prev,
+      ].slice(0, 5));
+
+      if (isAccepted) {
+        playSound("connect");
         setCallStatus("connected");
         webRTC.startCall(msg.responder_id);
       } else {
         playSound("error");
+        setOutgoingCallUserId(null);
         setCallStatus(null);
         addToast("Call rejected or user busy", "default");
       }
     },
     onCallEnd: (msg) => {
+      setNotifications((prev) => [
+        {
+          id: Math.random().toString(36).substring(7),
+          text: `📞 Call ended`,
+          time: Date.now(),
+          read: false,
+        },
+        ...prev,
+      ].slice(0, 5));
       setIncomingCall(null);
+      setOutgoingCallUserId(null);
       setCallStatus(null);
-      webRTC.endCall(msg.target_user_id || msg.caller_id);
+      webRTC.endCall(msg.sender_id || msg.target_user_id || msg.caller_id);
       addToast("Call ended", "default");
     },
   });
@@ -603,6 +688,7 @@ export function MapProvider({ children }: { children: React.ReactNode }) {
   const handleWave = useCallback(() => {
     if (!selectedUser) return;
     setHasWaved(true);
+    playSound("wave");
     addToast(`You waved at ${selectedUser.username}`);
     socket.sendWave(selectedUser.user_id);
   }, [selectedUser, addToast, socket]);
@@ -619,6 +705,7 @@ export function MapProvider({ children }: { children: React.ReactNode }) {
 
   const postIntent = useCallback((osmPlace?: any) => {
     if (!intentText.trim()) return;
+    playSound("success");
     socket.createHotspot(intentText, customHotspotRange, osmPlace);
     setIntentText("");
     setShowIntentModal(false);
@@ -664,13 +751,24 @@ export function MapProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     setCallStatus("ringing");
+    setOutgoingCallUserId(targetUserId);
     socket.sendCallRequest(targetUserId);
   }, [socket, webRTC, addToast]);
 
   const acceptCall = useCallback(() => {
     if (!incomingCall) return;
     setCallStatus("connected");
+    setOutgoingCallUserId(incomingCall.caller_id);
     socket.respondCallRequest(incomingCall.caller_id, myUserId, "accepted");
+    setNotifications((prev) => [
+      {
+        id: Math.random().toString(36).substring(7),
+        text: `📞 Call with @${incomingCall.caller_username} connected`,
+        time: Date.now(),
+        read: false,
+      },
+      ...prev,
+    ].slice(0, 5));
     setIncomingCall(null);
   }, [incomingCall, socket, myUserId]);
 
@@ -678,18 +776,79 @@ export function MapProvider({ children }: { children: React.ReactNode }) {
     if (!incomingCall) return;
     socket.respondCallRequest(incomingCall.caller_id, myUserId, "rejected");
     setIncomingCall(null);
+    setOutgoingCallUserId(null);
     setCallStatus(null);
   }, [incomingCall, socket, myUserId]);
 
   const hangUp = useCallback(() => {
-    const target = webRTC.activeCallUserId || incomingCall?.caller_id;
+    const target = webRTC.activeCallUserId || outgoingCallUserId || incomingCall?.caller_id;
     if (target) {
       socket.sendCallEnd(target);
       webRTC.endCall(target);
     }
     setIncomingCall(null);
+    setOutgoingCallUserId(null);
     setCallStatus(null);
-  }, [socket, webRTC, incomingCall]);
+  }, [socket, webRTC, outgoingCallUserId, incomingCall]);
+
+  // Call Timeout Refs to avoid dependency-triggered resets.
+  // Updated synchronously in render body to guarantee the latest closure is always available.
+  const hangUpRef = useRef(hangUp);
+  const rejectCallRef = useRef(rejectCall);
+  hangUpRef.current = hangUp;
+  rejectCallRef.current = rejectCall;
+
+  // Track outgoing/incoming calls in refs for logging purposes
+  const outgoingCallUserIdRef = useRef(outgoingCallUserId);
+  outgoingCallUserIdRef.current = outgoingCallUserId;
+
+  const incomingCallRef = useRef(incomingCall);
+  incomingCallRef.current = incomingCall;
+
+  // Log state updates to help diagnose any unexpected state resets
+  useEffect(() => {
+    console.log("[MapProvider Call State] Updated - callStatus:", callStatus, "incomingCall:", incomingCall, "outgoingCallUserId:", outgoingCallUserId);
+  }, [callStatus, incomingCall, outgoingCallUserId]);
+
+  // Outgoing call timeout (unanswered calls cut after 30 seconds)
+  useEffect(() => {
+    let timeout: any;
+    if (callStatus === "ringing") {
+      const targetId = outgoingCallUserIdRef.current;
+      console.log(`[call_timeout] Setting outgoing call timeout for 30 seconds targeting: ${targetId}`);
+      timeout = setTimeout(() => {
+        console.log(`[call_timeout] Outgoing call timeout fired! Closing unanswered call to target: ${outgoingCallUserIdRef.current}`);
+        addToast("Call unanswered", "default");
+        hangUpRef.current();
+      }, 30000);
+    }
+    return () => {
+      if (timeout) {
+        console.log("[call_timeout] Clearing outgoing call timeout");
+        clearTimeout(timeout);
+      }
+    };
+  }, [callStatus, addToast]);
+
+  // Incoming call timeout (missed calls cut after 30 seconds)
+  useEffect(() => {
+    let timeout: any;
+    if (incomingCall) {
+      const callerId = incomingCall.caller_id;
+      console.log(`[call_timeout] Setting incoming call timeout for 30 seconds from caller: ${callerId}`);
+      timeout = setTimeout(() => {
+        console.log(`[call_timeout] Incoming call timeout fired! Rejecting missed call from caller: ${incomingCallRef.current?.caller_id}`);
+        addToast("Call missed", "default");
+        rejectCallRef.current();
+      }, 30000);
+    }
+    return () => {
+      if (timeout) {
+        console.log("[call_timeout] Clearing incoming call timeout");
+        clearTimeout(timeout);
+      }
+    };
+  }, [incomingCall?.caller_id, addToast]);
 
   // Deprecated - history loaded directly in main effect from localStorage
 

@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { globalEventBus } from "@/lib/eventBus";
+import { playSound } from "@/lib/sounds";
 
 export interface DirectMessage {
   id: string;
@@ -253,6 +254,15 @@ export function ChatProvider({
             ...prev,
             [msg.message.sender_id]: (prev[msg.message.sender_id] || 0) + 1,
           }));
+          setNotifications((prev) => [
+            {
+              id: Math.random().toString(36).substring(7),
+              text: `✉️ Message from @${msg.message.sender_username}`,
+              time: Date.now(),
+              read: false,
+            },
+            ...prev,
+          ].slice(0, 5));
         }
         if (typeof window !== "undefined") {
           try {
@@ -309,10 +319,30 @@ export function ChatProvider({
       const otherInfo = activeUsers.find((u: any) => u.user_id === otherUser);
       const otherHandle = otherInfo?.username || "Someone";
 
+      playSound(isAccepted ? "success" : "error");
+
       if (isAccepted) {
         addToast(`✅ Connected with @${otherHandle}! You can now chat.`, "default");
+        setNotifications((prev: any) => [
+          {
+            id: Math.random().toString(36).substring(7),
+            text: `✅ Connected with @${otherHandle}`,
+            time: Date.now(),
+            read: false,
+          },
+          ...prev,
+        ].slice(0, 5));
       } else {
         addToast(`❌ Chat request to @${otherHandle} was declined.`, "default");
+        setNotifications((prev: any) => [
+          {
+            id: Math.random().toString(36).substring(7),
+            text: `❌ Request to @${otherHandle} declined`,
+            time: Date.now(),
+            read: false,
+          },
+          ...prev,
+        ].slice(0, 5));
       }
 
       setChatRequests((prev) => {

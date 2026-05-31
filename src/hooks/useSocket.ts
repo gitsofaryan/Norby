@@ -668,6 +668,7 @@ export function useSocket({
     return send({
       type: "call_end",
       target_user_id: targetUserId,
+      sender_id: userId,
     });
   };
 

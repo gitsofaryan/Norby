@@ -1,4 +1,4 @@
-export type SoundType = "pop" | "click" | "ring" | "success" | "error";
+export type SoundType = "pop" | "click" | "ring" | "success" | "error" | "wave" | "connect" | "nearby" | "broadcast";
 
 export const playSound = (type: SoundType) => {
   if (typeof window === "undefined") return;
@@ -68,6 +68,54 @@ export const playSound = (type: SoundType) => {
         gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
         osc.start(now);
         osc.stop(now + 0.3);
+        break;
+      case "wave":
+        // Pitch sweep whoosh up and down quickly
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(300, now);
+        osc.frequency.exponentialRampToValueAtTime(600, now + 0.12);
+        osc.frequency.exponentialRampToValueAtTime(300, now + 0.25);
+        gain.gain.setValueAtTime(0, now);
+        gain.gain.linearRampToValueAtTime(0.35, now + 0.04);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+        osc.start(now);
+        osc.stop(now + 0.25);
+        break;
+      case "connect":
+        // Rising chime chord C5 -> E5 -> G5
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(523.25, now);
+        osc.frequency.setValueAtTime(659.25, now + 0.08);
+        osc.frequency.setValueAtTime(783.99, now + 0.16);
+        gain.gain.setValueAtTime(0, now);
+        gain.gain.linearRampToValueAtTime(0.25, now + 0.02);
+        gain.gain.setValueAtTime(0.25, now + 0.18);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+        osc.start(now);
+        osc.stop(now + 0.3);
+        break;
+      case "nearby":
+        // Soft bubble drop sweep
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(750, now);
+        osc.frequency.exponentialRampToValueAtTime(250, now + 0.14);
+        gain.gain.setValueAtTime(0, now);
+        gain.gain.linearRampToValueAtTime(0.18, now + 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.14);
+        osc.start(now);
+        osc.stop(now + 0.14);
+        break;
+      case "broadcast":
+        // Retro pulse frequency wobble
+        osc.type = "triangle";
+        osc.frequency.setValueAtTime(800, now);
+        osc.frequency.linearRampToValueAtTime(950, now + 0.08);
+        osc.frequency.linearRampToValueAtTime(800, now + 0.16);
+        gain.gain.setValueAtTime(0, now);
+        gain.gain.linearRampToValueAtTime(0.2, now + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.22);
+        osc.start(now);
+        osc.stop(now + 0.22);
         break;
     }
   } catch (err) {
