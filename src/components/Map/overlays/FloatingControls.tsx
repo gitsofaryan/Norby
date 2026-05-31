@@ -125,6 +125,7 @@ function FloatingControlsInner() {
         <div className="pointer-events-auto absolute top-[120px] right-4 z-[410] flex flex-col gap-2">
           {/* Main Broadcast Toggle */}
           <button
+            id="btn-mic"
             onClick={() => {
               if (isBroadcastingAudio && isSpaceHost) {
                 stopBroadcast();
@@ -177,6 +178,7 @@ function FloatingControlsInner() {
       <div className="pointer-events-auto absolute bottom-28 right-5 flex flex-col items-center gap-4 z-[410]">
         {/* Recenter/Compass */}
         <button
+          id="btn-recenter"
           onClick={handleRecenterClick}
           className="w-12 h-12 rounded-full bg-white/95 backdrop-blur-md border border-zinc-200 shadow-[0_4px_15px_rgba(0,0,0,0.1)] flex items-center justify-center text-zinc-500 hover:text-zinc-900 transition-colors active:scale-90 cursor-pointer"
           title="Refresh Radar"
@@ -187,6 +189,7 @@ function FloatingControlsInner() {
         {/* Post Intent FAB */}
         {isSignedIn && (
           <motion.button
+            id="btn-post-intent"
             whileTap={{ scale: 0.88 }}
             onClick={() => setShowIntentModal(true)}
             className="w-14 h-14 bg-zinc-900 text-white rounded-2xl flex items-center justify-center shadow-[0_4px_20px_rgba(0,0,0,0.2)] hover:bg-black transition-colors cursor-pointer"

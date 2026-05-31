@@ -794,11 +794,27 @@ export default function ChatPage() {
                             </ul>
                             {location && (
                               <button
-                                onClick={() => {
+                                onClick={async () => {
                                   const sosMsg = `🚨 [SOS Alert] I am meeting someone for Norby hotspot "${selectedHotspot.title}". My current location is: https://maps.google.com/?q=${location.lat},${location.lng} (Coordinates: ${location.lat.toFixed(5)}, ${location.lng.toFixed(5)})`;
-                                  navigator.clipboard.writeText(sosMsg);
-                                  setCopiedSOS(true);
-                                  setTimeout(() => setCopiedSOS(false), 2000);
+                                  if (typeof navigator !== "undefined" && (navigator as any).share) {
+                                    try {
+                                      await navigator.share({
+                                        title: "Norby SOS Alert",
+                                        text: sosMsg,
+                                      });
+                                      addToast("SOS details shared!");
+                                    } catch (err: any) {
+                                      if (err.name !== "AbortError") {
+                                        navigator.clipboard.writeText(sosMsg);
+                                        setCopiedSOS(true);
+                                        setTimeout(() => setCopiedSOS(false), 2000);
+                                      }
+                                    }
+                                  } else {
+                                    navigator.clipboard.writeText(sosMsg);
+                                    setCopiedSOS(true);
+                                    setTimeout(() => setCopiedSOS(false), 2000);
+                                  }
                                 }}
                                 className={`w-full mt-2 py-2 rounded-xl text-[10px] font-bold transition-all active:scale-[0.98] cursor-pointer ${
                                   copiedSOS
@@ -806,7 +822,7 @@ export default function ChatPage() {
                                     : "bg-amber-600 hover:bg-amber-700 text-white"
                                 }`}
                               >
-                                {copiedSOS ? "✓ SOS Info Copied to Clipboard!" : "🚨 Copy SOS Coordinates & Details"}
+                                {copiedSOS ? "✓ SOS Info Copied!" : (typeof navigator !== "undefined" && (navigator as any).share) ? "🚨 Share SOS Coordinates & Details" : "🚨 Copy SOS Coordinates & Details"}
                               </button>
                             )}
                           </motion.div>

@@ -1,9 +1,10 @@
 "use client";
 
 import { useAuth, getAvatarUrl } from "@/hooks/useAuth";
-import { LogIn, LogOut, Loader2, Shield, X, Sparkles, Shuffle, Check, Upload, ChevronRight } from "lucide-react";
+import { LogIn, LogOut, Loader2, Shield, X, Sparkles, Shuffle, Check, Upload, ChevronRight, Volume2, HelpCircle } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useRouter } from "next/navigation";
 
 const INTEREST_TAGS = [
   "Study Grind 📚", "Specialty Coffee ☕", "Boba Runs 🧋", "Thrifting 🪵",
@@ -62,6 +63,7 @@ const GRADIENTS = [
 
 export default function ProfilePage() {
   const { isSignedIn, isLoading, user, profile, saveProfile, signIn, signOut, unblockUser } = useAuth();
+  const router = useRouter();
 
   const [gradientIdx, setGradientIdx] = useState<number>(0);
   const userGradient = GRADIENTS[gradientIdx];
@@ -90,6 +92,38 @@ export default function ProfilePage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+
+  // Sound preferences and custom tag states
+  const [muteSounds, setMuteSounds] = useState(false);
+  const [customTagInput, setCustomTagInput] = useState("");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setMuteSounds(localStorage.getItem("norby_mute_sounds") === "true");
+    }
+  }, []);
+
+  const handleToggleMuteSounds = (val: boolean) => {
+    setMuteSounds(val);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("norby_mute_sounds", val ? "true" : "false");
+    }
+  };
+
+  const handleAddCustomTag = () => {
+    const cleanTag = customTagInput.trim();
+    if (!cleanTag) return;
+    if (selectedTags.includes(cleanTag)) {
+      setCustomTagInput("");
+      return;
+    }
+    if (selectedTags.length >= 6) {
+      setError("Maximum of 6 tags allowed.");
+      return;
+    }
+    setSelectedTags(prev => [...prev, cleanTag]);
+    setCustomTagInput("");
+  };
 
   // Click outside for floating vibe emoji picker
   useEffect(() => {
@@ -487,6 +521,41 @@ export default function ProfilePage() {
                 </button>
               );
             })}
+            {/* Custom user interest tags */}
+            {selectedTags.filter(tag => !INTEREST_TAGS.includes(tag)).map(tag => (
+              <button
+                key={tag}
+                onClick={() => toggleTag(tag)}
+                className="px-2.5 py-1.5 rounded-full border text-[10px] font-semibold transition-all active:scale-95 bg-zinc-900 border-zinc-900 text-white flex items-center gap-1 cursor-pointer"
+                title="Click to remove custom tag"
+              >
+                {tag} <X size={10} className="opacity-60 shrink-0" />
+              </button>
+            ))}
+          </div>
+
+          {/* Custom Tag Input */}
+          <div className="mt-3.5 pt-3 border-t border-zinc-100 flex gap-2">
+            <input
+              type="text"
+              value={customTagInput}
+              onChange={e => setCustomTagInput(e.target.value.slice(0, 24))}
+              placeholder="Add custom tag (e.g. Hiking 🥾)"
+              className="flex-1 bg-zinc-50 border border-zinc-200 rounded-xl px-3 py-2 text-xs font-medium text-zinc-900 focus:outline-none focus:border-zinc-400 transition-colors"
+              onKeyDown={e => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  handleAddCustomTag();
+                }
+              }}
+            />
+            <button
+              type="button"
+              onClick={handleAddCustomTag}
+              className="px-4 rounded-xl bg-zinc-900 text-white font-bold text-xs hover:bg-black active:scale-95 transition-all cursor-pointer flex items-center justify-center shrink-0"
+            >
+              Add
+            </button>
           </div>
         </div>
       </div>
@@ -547,6 +616,57 @@ export default function ProfilePage() {
             className={`w-11 h-6 rounded-full p-0.5 transition-colors shrink-0 ${maskLocation ? "bg-zinc-900" : "bg-zinc-200"}`}
           >
             <div className={`w-5 h-5 rounded-full bg-white shadow transition-transform ${maskLocation ? "translate-x-5" : "translate-x-0"}`} />
+          </button>
+        </div>
+      </div>
+
+      {/* ═══════════════ APP PREFERENCES ═══════════════ */}
+      <div className="bg-white mx-3 mt-3 rounded-2xl border border-zinc-100 overflow-hidden">
+        <div className="px-4 py-3 border-b border-zinc-50">
+          <h3 className="text-[10px] font-bold tracking-widest uppercase text-zinc-400">App Preferences</h3>
+        </div>
+
+        {/* Mute Sound Effects */}
+        <div className="px-4 py-3 flex items-center justify-between gap-3 border-b border-zinc-50">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-zinc-100 flex items-center justify-center shrink-0">
+              <Volume2 size={14} className="text-zinc-500" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-zinc-800">Sound Effects</p>
+              <p className="text-[9px] text-zinc-400 leading-relaxed">Play audio chimes and waves</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => handleToggleMuteSounds(!muteSounds)}
+            className={`w-11 h-6 rounded-full p-0.5 transition-colors shrink-0 ${muteSounds ? "bg-zinc-200" : "bg-zinc-900"}`}
+          >
+            <div className={`w-5 h-5 rounded-full bg-white shadow transition-transform ${muteSounds ? "translate-x-0" : "translate-x-5"}`} />
+          </button>
+        </div>
+
+        {/* App Tour */}
+        <div className="px-4 py-3 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-zinc-100 flex items-center justify-center shrink-0">
+              <HelpCircle size={14} className="text-zinc-500" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-zinc-800">App Walkthrough</p>
+              <p className="text-[9px] text-zinc-400 leading-relaxed">Replay the introductory tour</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              localStorage.setItem("norby_start_onboarding_tour", "true");
+              localStorage.removeItem("norby_onboarding_completed");
+              router.push("/");
+            }}
+            className="px-3.5 py-1.5 rounded-xl border border-zinc-200 hover:border-zinc-300 bg-white text-zinc-700 text-[10px] font-bold transition-all active:scale-95 shadow-sm cursor-pointer"
+          >
+            Restart Tour
           </button>
         </div>
       </div>

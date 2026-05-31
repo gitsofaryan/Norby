@@ -25,7 +25,7 @@ export function VibeFilterBar() {
   };
 
   return (
-    <div className="pointer-events-auto absolute top-4 left-4 right-4 z-[410]">
+    <div id="vibe-filter-bar" className="pointer-events-auto absolute top-4 left-4 right-4 z-[410]">
       <div className="flex gap-2 overflow-x-auto scrollbar-none [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] pb-0.5">
         {VIBE_FILTERS.map((f) => (
           <button

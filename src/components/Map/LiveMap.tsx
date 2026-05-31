@@ -4,7 +4,8 @@ import { useEffect, useMemo, useState, useRef, useCallback } from "react";
 import { MapContainer, TileLayer, useMap, Polyline } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import { AnimatePresence, motion } from "framer-motion";
-import { Compass } from "lucide-react";
+import { Compass, ChevronRight, X } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 import { useMapContext } from "./MapProvider";
 import { UserMarker } from "./markers/UserMarker";
@@ -130,6 +131,101 @@ function LiveMapContent() {
     profile,
     setSelectedUser,
   } = useMapContext();
+
+  const [onboardingStep, setOnboardingStep] = useState<number | null>(null);
+  const [highlightRect, setHighlightRect] = useState<{ top: number; left: number; width: number; height: number } | null>(null);
+  const router = useRouter();
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && myUserId) {
+      const completed = localStorage.getItem("norby_onboarding_completed") === "true";
+      const restartTrigger = localStorage.getItem("norby_start_onboarding_tour") === "true";
+      
+      if (restartTrigger) {
+        localStorage.removeItem("norby_start_onboarding_tour");
+        setOnboardingStep(0);
+      } else if (!completed) {
+        setOnboardingStep(0);
+      }
+    }
+  }, [myUserId]);
+
+  useEffect(() => {
+    const updatePosition = () => {
+      if (onboardingStep === null || onboardingStep === 0 || onboardingStep === 5) {
+        setHighlightRect(null);
+        return;
+      }
+      const selectors = [
+        "#vibe-filter-bar",
+        "#btn-post-intent",
+        "#btn-recenter",
+        "#btn-mic",
+        null, // Step 5 is centered info about calls/waves
+        "#nav-chat",
+        "#nav-profile"
+      ];
+      const selector = selectors[onboardingStep - 1];
+      if (selector) {
+        const el = document.querySelector(selector);
+        if (el) {
+          const rect = el.getBoundingClientRect();
+          setHighlightRect((prev) => {
+            if (
+              prev &&
+              prev.top === rect.top &&
+              prev.left === rect.left &&
+              prev.width === rect.width &&
+              prev.height === rect.height
+            ) {
+              return prev;
+            }
+            return {
+              top: rect.top,
+              left: rect.left,
+              width: rect.width,
+              height: rect.height
+            };
+          });
+          return;
+        }
+      }
+      setHighlightRect(null);
+    };
+
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition);
+
+    // Poll every 400ms to handle dynamic overlays and bottom navigation loading shifts
+    const interval = setInterval(updatePosition, 400);
+    const timer = setTimeout(updatePosition, 300);
+
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition);
+      clearInterval(interval);
+      clearTimeout(timer);
+    };
+  }, [onboardingStep]);
+
+  const handleNextOnboarding = () => {
+    setOnboardingStep((prev) => {
+      if (prev === null) return null;
+      if (prev >= 7) {
+        localStorage.setItem("norby_onboarding_completed", "true");
+        router.push("/profile");
+        return null;
+      }
+      return prev + 1;
+    });
+  };
+
+  const handleSkipOnboarding = () => {
+    localStorage.setItem("norby_onboarding_completed", "true");
+    setOnboardingStep(null);
+    router.push("/profile");
+  };
   
   const [bounds, setBoundsRaw] = useState<any>(null);
   const boundsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -379,6 +475,253 @@ function LiveMapContent() {
           ))}
         </AnimatePresence>
       </div>
+
+      {/* Onboarding Spotlight Backdrop */}
+      <AnimatePresence>
+        {onboardingStep !== null && (
+          <>
+            {/* Transparent click blocker to prevent clicking underlying elements and messing up the tour state */}
+            <div className="fixed inset-0 z-[1180] bg-transparent pointer-events-auto cursor-default" />
+            
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[1190] bg-black/65 pointer-events-none"
+              style={
+                highlightRect
+                  ? {
+                      clipPath: `polygon(
+                        0% 0%, 0% 100%, 
+                        ${highlightRect.left}px 100%, 
+                        ${highlightRect.left}px ${highlightRect.top}px, 
+                        ${highlightRect.left + highlightRect.width}px ${highlightRect.top}px, 
+                        ${highlightRect.left + highlightRect.width}px ${highlightRect.top + highlightRect.height}px, 
+                        ${highlightRect.left}px ${highlightRect.top + highlightRect.height}px, 
+                        ${highlightRect.left}px 100%, 
+                        100% 100%, 100% 0%
+                      )`
+                    }
+                  : undefined
+              }
+            />
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Highlight Ring Overlay */}
+      <AnimatePresence>
+        {onboardingStep !== null && highlightRect && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{
+              opacity: 1,
+              scale: 1,
+              boxShadow: [
+                "0 0 0 0 rgba(245,158,11,0.6)",
+                "0 0 0 10px rgba(245,158,11,0)",
+                "0 0 0 0 rgba(245,158,11,0.6)"
+              ]
+            }}
+            exit={{ opacity: 0 }}
+            className={`fixed z-[1195] pointer-events-none border-2 border-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.6)] ${
+              onboardingStep === 3 || onboardingStep === 4 ? "rounded-full" : "rounded-2xl"
+            }`}
+            style={{
+              top: highlightRect.top - 4,
+              left: highlightRect.left - 4,
+              width: highlightRect.width + 8,
+              height: highlightRect.height + 8,
+            }}
+            transition={{
+              repeat: Infinity,
+              duration: 1.8,
+              ease: "easeInOut"
+            }}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Onboarding Walkthrough Tooltip */}
+      <AnimatePresence>
+        {onboardingStep !== null && (
+          <motion.div
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 15 }}
+            className="fixed z-[1200] w-[calc(100%-32px)] max-w-sm bg-white/95 backdrop-blur-lg border border-zinc-200/80 shadow-[0_25px_60px_rgba(0,0,0,0.18)] rounded-[32px] p-6 flex flex-col gap-4 text-zinc-900 select-none pointer-events-auto"
+            style={
+              highlightRect
+                ? highlightRect.top < (typeof window !== "undefined" ? window.innerHeight / 2 : 400)
+                  ? {
+                      top: highlightRect.top + highlightRect.height + 16,
+                      left: "16px",
+                      right: "16px",
+                      marginLeft: "auto",
+                      marginRight: "auto"
+                    }
+                  : {
+                      bottom: (typeof window !== "undefined" ? window.innerHeight - highlightRect.top : 400) + 16,
+                      left: "16px",
+                      right: "16px",
+                      marginLeft: "auto",
+                      marginRight: "auto"
+                    }
+                : {
+                    top: "50%",
+                    left: "16px",
+                    right: "16px",
+                    marginTop: "-145px",
+                    marginLeft: "auto",
+                    marginRight: "auto"
+                  }
+            }
+          >
+            {/* Skip button */}
+            <button
+              onClick={handleSkipOnboarding}
+              className="absolute top-5 right-5 p-1.5 rounded-full bg-zinc-100 hover:bg-zinc-200 text-zinc-400 hover:text-zinc-650 transition-colors cursor-pointer"
+              title="Skip onboarding"
+            >
+              <X size={13} />
+            </button>
+
+            {/* Tour branding and Step indicator */}
+            <div className="flex justify-between items-center">
+              <span className="text-[9px] uppercase tracking-widest font-black text-amber-600 bg-amber-50 border border-amber-200/50 px-2 py-0.5 rounded-full">
+                Norby Tour
+              </span>
+              <div className="flex gap-1 items-center mr-6">
+                {[0, 1, 2, 3, 4, 5, 6, 7].map((s) => (
+                  <div
+                    key={s}
+                    className={`h-1.5 rounded-full transition-all duration-300 ${
+                      onboardingStep === s ? "w-4 bg-amber-500" : "w-1 bg-zinc-200"
+                    }`}
+                  />
+                ))}
+              </div>
+            </div>
+
+            {/* Step Content */}
+            {onboardingStep === 0 && (
+              <div className="flex flex-col gap-2 mt-1">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-50 to-amber-100 border border-amber-200/40 flex items-center justify-center text-2xl shadow-inner">
+                  👋
+                </div>
+                <h3 className="text-base font-black tracking-tight text-zinc-950 mt-1 font-sans">Welcome to Norby!</h3>
+                <p className="text-xs text-zinc-500 font-medium leading-relaxed font-sans">
+                  Norby connects you with people nearby in real-time. Drop a hotspot, broadcast your vibe, and chat with neighbors. Stop scrolling, start meeting!
+                </p>
+                <p className="text-[11px] text-amber-600 bg-amber-50/50 border border-amber-200/40 rounded-2xl p-3 font-semibold leading-relaxed mt-1 font-sans">
+                  🔒 <strong>Important:</strong> To unlock calling, voice spaces, and chat rooms, you need to sign in. We'll direct you to the Profile page at the end of this tour!
+                </p>
+              </div>
+            )}
+
+            {onboardingStep === 1 && (
+              <div className="flex flex-col gap-2 mt-1">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-50 to-amber-100 border border-amber-200/40 flex items-center justify-center text-2xl shadow-inner">
+                  ☕
+                </div>
+                <h3 className="text-base font-black tracking-tight text-zinc-955 mt-1 font-sans">Choose a Vibe</h3>
+                <p className="text-xs text-zinc-500 font-medium leading-relaxed font-sans">
+                  Tap these buttons to find people who want to do the same things as you—like grab coffee, study, lift weights, or play games.
+                </p>
+              </div>
+            )}
+
+            {onboardingStep === 2 && (
+              <div className="flex flex-col gap-2 mt-1">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-rose-50 to-rose-100 border border-rose-200/40 flex items-center justify-center text-2xl shadow-inner">
+                  🔥
+                </div>
+                <h3 className="text-base font-black tracking-tight text-zinc-955 mt-1 font-sans">Host a Hangout</h3>
+                <p className="text-xs text-zinc-500 font-medium leading-relaxed font-sans">
+                  Tap this button to drop a "Hotspot" on the map. Say what you want to do (e.g. "Study at Starbucks") so others can request to join you!
+                </p>
+              </div>
+            )}
+
+            {onboardingStep === 3 && (
+              <div className="flex flex-col gap-2 mt-1">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-blue-50 to-blue-100 border border-blue-200/40 flex items-center justify-center text-2xl shadow-inner">
+                  🧭
+                </div>
+                <h3 className="text-base font-black tracking-tight text-zinc-955 mt-1 font-sans">Recenter & Scan</h3>
+                <p className="text-xs text-zinc-500 font-medium leading-relaxed font-sans">
+                  Tap this compass button to scan for nearby neighbors and recenter the map on your current location.
+                </p>
+              </div>
+            )}
+
+            {onboardingStep === 4 && (
+              <div className="flex flex-col gap-2 mt-1">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-purple-50 to-purple-100 border border-purple-200/40 flex items-center justify-center text-2xl shadow-inner">
+                  🎙️
+                </div>
+                <h3 className="text-base font-black tracking-tight text-zinc-955 mt-1 font-sans">Start a Live Space</h3>
+                <p className="text-xs text-zinc-500 font-medium leading-relaxed font-sans">
+                  Tap the microphone to start a live voice room. Speak with anyone nearby in real-time, or invite approved speakers to join the stage.
+                </p>
+              </div>
+            )}
+
+            {onboardingStep === 5 && (
+              <div className="flex flex-col gap-2 mt-1">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-orange-50 to-orange-100 border border-orange-200/40 flex items-center justify-center text-2xl shadow-inner">
+                  📞
+                </div>
+                <h3 className="text-base font-black tracking-tight text-zinc-955 mt-1 font-sans">Wave & Voice Call</h3>
+                <p className="text-xs text-zinc-500 font-medium leading-relaxed font-sans">
+                  Tap any neighbor's icon on the map to wave at them (with a sound effect) or start a direct, free voice call!
+                </p>
+              </div>
+            )}
+
+            {onboardingStep === 6 && (
+              <div className="flex flex-col gap-2 mt-1">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-teal-50 to-teal-100 border border-teal-200/40 flex items-center justify-center text-2xl shadow-inner">
+                  💬
+                </div>
+                <h3 className="text-base font-black tracking-tight text-zinc-955 mt-1 font-sans">Chats & Groups</h3>
+                <p className="text-xs text-zinc-500 font-medium leading-relaxed font-sans">
+                  Go here to manage your direct conversations, accept pending friend requests, or chat in group rooms for hotspots you've joined.
+                </p>
+              </div>
+            )}
+
+            {onboardingStep === 7 && (
+              <div className="flex flex-col gap-2 mt-1">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-emerald-50 to-emerald-100 border border-emerald-200/40 flex items-center justify-center text-2xl shadow-inner">
+                  👤
+                </div>
+                <h3 className="text-base font-black tracking-tight text-zinc-955 mt-1 font-sans">Your Profile</h3>
+                <p className="text-xs text-zinc-500 font-medium leading-relaxed font-sans">
+                  Go here to customize your username, select a custom avatar, add interests, and toggle sound or location preferences.
+                </p>
+              </div>
+            )}
+
+            {/* Footer controls */}
+            <div className="flex justify-between items-center mt-3 pt-3.5 border-t border-zinc-100">
+              <button
+                onClick={handleSkipOnboarding}
+                className="text-xs font-bold text-zinc-400 hover:text-zinc-650 transition-colors cursor-pointer font-sans"
+              >
+                Skip Tour
+              </button>
+              <button
+                onClick={handleNextOnboarding}
+                className="px-5 py-3 rounded-2xl bg-zinc-950 hover:bg-black text-white text-xs font-extrabold transition-all hover:scale-[1.02] active:scale-95 cursor-pointer flex items-center gap-1 shadow-md font-sans"
+              >
+                {onboardingStep === 7 ? "Go to Profile ➡️" : "Next Step"}
+                {onboardingStep !== 7 && <ChevronRight size={13} />}
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
