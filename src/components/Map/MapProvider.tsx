@@ -878,12 +878,22 @@ export function MapProvider({ children }: { children: React.ReactNode }) {
     chill: ["chill", "vibe", "hangout", "drive", "explore", "roam", "wander", "sunset", "night", "midnight", "smoke", "terrace", "rooftop", "🎨", "⚡", "📷", "🌿", "🍳", "🚗", "🌙"],
   };
 
+  function matchesWord(text: string, keyword: string): boolean {
+    const isAlphaNum = /^[a-zA-Z0-9]+$/.test(keyword);
+    if (isAlphaNum) {
+      const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const regex = new RegExp(`\\b${escaped}\\b`, 'i');
+      return regex.test(text);
+    }
+    return text.includes(keyword);
+  }
+
   function matchesFilter(intent: any, key: string): boolean {
     if (key === "all") return true;
     const keywords = FILTER_KEYWORDS[key];
     if (!keywords) return true;
     const t = (intent.title || "").toLowerCase();
-    return keywords.some((k) => t.includes(k));
+    return keywords.some((k) => matchesWord(t, k));
   }
 
   function matchesUserFilter(u: any, key: string): boolean {
@@ -898,8 +908,8 @@ export function MapProvider({ children }: { children: React.ReactNode }) {
     // Match by bio or tags
     const bio = (u.bio || "").toLowerCase();
     const tags = u.selectedTags || [];
-    if (keywords.some((k) => bio.includes(k))) return true;
-    if (tags.some((tag: string) => keywords.some((k) => tag.toLowerCase().includes(k)))) return true;
+    if (keywords.some((k) => matchesWord(bio, k))) return true;
+    if (tags.some((tag: string) => keywords.some((k) => matchesWord(tag.toLowerCase(), k)))) return true;
 
     return false;
   }
@@ -924,7 +934,7 @@ export function MapProvider({ children }: { children: React.ReactNode }) {
     return intents.filter((h) => {
       const isBlocked = blockedIds.includes(h.host_id);
       const dist = getDistanceKm(location.lat, location.lng, h.lat, h.lng);
-      const isWithinRange = dist <= radarRadius && dist <= (h.hotspotRange || 15);
+      const isWithinRange = dist <= radarRadius;
       const isNotExpired = h.expires_at > Date.now();
       const isMatchesFilter = matchesFilter(h, selectedFilter);
       return !isBlocked && isWithinRange && isNotExpired && isMatchesFilter;
@@ -1106,6 +1116,51 @@ export function MapProvider({ children }: { children: React.ReactNode }) {
     activeRouteMode,
     routingTarget,
     isLoadingRoute,
+
+    refreshRadar,
+    setZoom,
+    setFollowUser,
+    setIsInteracting,
+    setSelectedFilter,
+    setSelectedUser,
+    setSelectedHotspot,
+    setShowIntentModal,
+    setIntentText,
+    setCustomHotspotRange,
+    setHasWaved,
+    setConfirmBlock,
+    addToast,
+    setNotifications,
+    setShowNotifDropdown,
+    handleWave,
+    handleBlock,
+    postIntent,
+    requestJoin,
+    respondRequest,
+    sendMessage,
+    leaveHotspot,
+    initiateCall,
+    acceptCall,
+    rejectCall,
+    hangUp,
+    webRTC.startBroadcast,
+    webRTC.stopBroadcast,
+    webRTC.startListening,
+    webRTC.stopListening,
+    setIsSpeakerMuted,
+    webRTC.requestToSpeak,
+    webRTC.cancelSpeakRequest,
+    webRTC.approveSpeaker,
+    webRTC.declineSpeaker,
+    webRTC.muteSpeaker,
+    webRTC.unmuteSpeaker,
+    webRTC.removeSpeaker,
+    webRTC.toggleLocalMic,
+    webRTC.leaveSpace,
+    setShowSpaceDrawer,
+    clearActiveRoute,
+    setActiveRouteMode,
+    setRoutingTarget,
   ]);
 
   return (

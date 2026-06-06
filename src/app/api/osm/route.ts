@@ -39,6 +39,16 @@ export async function GET(request: Request) {
     );
   }
 
+  // BUG-01: Bounding box area validation to prevent abuse/DoS
+  const latDiff = Math.abs(n - s);
+  const lngDiff = Math.abs(e - w);
+  if (latDiff > 0.1 || lngDiff > 0.1) {
+    return Response.json(
+      { error: "Bbox dimensions too large. Maximum size is 0.1 x 0.1 degrees." },
+      { status: 400 }
+    );
+  }
+
   const cacheKey = `${s},${w},${n},${e}`;
   const cached = cache.get(cacheKey);
   const now = Date.now();
@@ -87,6 +97,13 @@ export async function GET(request: Request) {
       return { elements: namedPlaces };
     })
     .then((payload) => {
+      // BUG-02: Implement Cache growth cap to prevent memory leak
+      if (cache.size >= 500) {
+        const oldestKey = cache.keys().next().value;
+        if (oldestKey !== undefined) {
+          cache.delete(oldestKey);
+        }
+      }
       cache.set(cacheKey, { timestamp: Date.now(), payload });
       return payload;
     })

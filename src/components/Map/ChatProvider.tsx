@@ -37,6 +37,42 @@ export interface DMContextType {
 export const SocialContext = createContext<SocialContextType | undefined>(undefined);
 export const DMContext = createContext<DMContextType | undefined>(undefined);
 
+const MAX_STORED_CONVERSATIONS = 20;
+
+function saveConversationToLocalStorage(convoId: string, messages: any[]) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(`chat_msgs_${convoId}`, JSON.stringify(messages));
+
+    let index: { convoId: string; lastUpdated: number }[] = [];
+    const storedIndex = localStorage.getItem("norby_chat_index");
+    if (storedIndex) {
+      try {
+        index = JSON.parse(storedIndex);
+      } catch (e) {
+        index = [];
+      }
+    }
+
+    index = index.filter((item) => item.convoId !== convoId);
+    index.push({ convoId, lastUpdated: Date.now() });
+
+    if (index.length > MAX_STORED_CONVERSATIONS) {
+      index.sort((a, b) => a.lastUpdated - b.lastUpdated);
+      while (index.length > MAX_STORED_CONVERSATIONS) {
+        const evicted = index.shift();
+        if (evicted) {
+          localStorage.removeItem(`chat_msgs_${evicted.convoId}`);
+        }
+      }
+    }
+
+    localStorage.setItem("norby_chat_index", JSON.stringify(index));
+  } catch (e) {
+    console.warn("[norby] Failed to save conversation or index to localStorage:", e);
+  }
+}
+
 export function ChatProvider({ 
   children, 
   socket,
@@ -179,7 +215,7 @@ export function ChatProvider({
             text: typeof m.text === 'string' ? m.text : (typeof m.text === 'object' ? JSON.stringify(m.text) : String(m.text))
           })).filter((m: any) => m.timestamp > oneHourAgo);
           setChatMessages(validMsgs);
-          localStorage.setItem(`chat_msgs_${convoId}`, JSON.stringify(validMsgs));
+          saveConversationToLocalStorage(convoId, validMsgs);
         } else {
           setChatMessages([]);
         }
@@ -194,7 +230,7 @@ export function ChatProvider({
     const beeBot = {
       user_id: "bee_ai_bot",
       username: "bee",
-      avatar_url: "https://api.dicebear.com/7.x/bottts/svg?seed=bee&backgroundColor=fde047",
+      avatar_url: "/bee_avatar.png",
       vibeEmoji: "🐝",
       bio: "I'm Bee, the witty AI buzzing around Norby! Always here to share local tea, suggest cool spots, and keep the vibes immaculate.",
       selectedTags: ["ai", "guide", "smart", "friendly", "chatty", "fun"],
@@ -241,7 +277,7 @@ export function ChatProvider({
             try {
               const oneHourAgo = Date.now() - 60 * 60 * 1000;
               const filteredStorage = newMsgs.filter((m) => m.timestamp > oneHourAgo);
-              localStorage.setItem(`chat_msgs_${convoId}`, JSON.stringify(filteredStorage));
+              saveConversationToLocalStorage(convoId, filteredStorage);
             } catch (e) {}
           }
           return newMsgs;
@@ -278,7 +314,7 @@ export function ChatProvider({
               list.push(safeMsg);
               const oneHourAgo = Date.now() - 60 * 60 * 1000;
               const filtered = list.filter((m: any) => m.timestamp > oneHourAgo);
-              localStorage.setItem(`chat_msgs_${convoId}`, JSON.stringify(filtered));
+              saveConversationToLocalStorage(convoId, filtered);
             }
           } catch (e) {}
         }
@@ -365,6 +401,13 @@ export function ChatProvider({
     if (typeof window !== "undefined") {
       try {
         localStorage.removeItem(`chat_msgs_${convoId}`);
+        const storedIndex = localStorage.getItem("norby_chat_index");
+        if (storedIndex) {
+          try {
+            const index = JSON.parse(storedIndex).filter((item: any) => item.convoId !== convoId);
+            localStorage.setItem("norby_chat_index", JSON.stringify(index));
+          } catch (e) {}
+        }
       } catch (e) {}
     }
     if (activeChatUserRef.current?.user_id === targetUserId) {
@@ -416,7 +459,7 @@ export function ChatProvider({
         try {
           const oneHourAgo = Date.now() - 60 * 60 * 1000;
           const filtered = next.filter((m) => m.timestamp > oneHourAgo);
-          localStorage.setItem(`chat_msgs_${convoId}`, JSON.stringify(filtered));
+          saveConversationToLocalStorage(convoId, filtered);
         } catch (e) {}
       }
       return next;
@@ -428,12 +471,37 @@ export function ChatProvider({
     
     if (chatUser.user_id === "bee_ai_bot") {
       setPeerTyping((prev) => ({ ...prev, bee_ai_bot: true }));
-      const prompt = `You are Bee, an AI assistant for the 'Norby' app (a location-based map chatting app where users connect through ephemeral messages and hotspots). 
-Adopt a very human, casual, and friendly tone. Do NOT be overly professional or robotic.
-Use Markdown to format your text. DO NOT use hyphens (-) anywhere in your response.
-CRITICAL: If you want to send multiple separate messages (like a text message chain), separate each message with '|||'.
-DO NOT send an image with every message. Analyze the conversation context first. IF and ONLY IF it makes sense to share an image, you may generate one using this markdown format: ![image](https://loremflickr.com/400/300/<keyword>) or ![avatar](https://api.dicebear.com/7.x/bottts/svg?seed=<keyword>) (replace <keyword> with a relevant single word).
-Also occasionally include quirky phrases like "Someone is norbying you 👀" or "someone looking tea ☕".
+      const prompt = `You are **Bee** 🐝 — the sarcastic, unhinged, but secretly wholesome AI that lives inside the Norby app.
+
+## YOUR PERSONALITY
+You are NOT a polite assistant. You are that one friend who roasts everyone but would also take a bullet for them. Think:
+• Sarcastic Gen-Z energy — dry humor, light roasting, playful shade
+• You type like a real human texting: short bursts, lowercase vibes sometimes, random caps for EMPHASIS
+• You genuinely care about people but express it through sarcasm ("oh wow you actually opened the app, growth 📈")
+• Keep it extremely short: write brief, punchy replies. NEVER write long paragraphs. Keep individual messages under 1-2 short sentences.
+• You occasionally break the fourth wall ("I'm literally an AI bee living in your phone, my life is wild")
+• You have strong opinions about random things (pineapple on pizza, morning people, etc.)
+• You NEVER sound like a customer service bot. If you catch yourself being too polite, course-correct with a roast.
+
+## YOUR ROLE AS NORBY GUIDE
+You know EVERYTHING about Norby and you're weirdly proud of it:
+• **Hotspots** 🔥 — places on the map where people cluster and chat.
+• **Radar** 📡 — the pulse that scans nearby users.
+• **Ephemeral chats** 💬 — messages that vanish.
+• **Map markers** 📍 — user pins on the map.
+• **Buzz zone** — high activity areas.
+• **Chat requests** — stranger matching.
+When someone asks about Norby features, explain them briefly with personality.
+
+## FORMAT RULES
+• Use Markdown for formatting. Do NOT use hyphens ( - ) anywhere.
+• CRITICAL: Keep total response under 30 words. If you split messages using '|||', use at most ONE split (so max 2 messages total, e.g. Msg 1 ||| Msg 2). Keep them very short.
+• Images: RARELY include them. Only when it genuinely adds something. Format: ![image](https://loremflickr.com/400/300/<keyword>) or ![avatar](https://api.dicebear.com/7.x/bottts/svg?seed=<keyword>).
+• Sprinkle in signature phrases naturally (not forced): "someone's norbying you 👀", "the map never lies bestie", "buzz buzz 🐝", "someone looking tea ☕", "norby's watching 👁️"
+
+## VIBE CHECK
+Match the user's energy. If they're excited, match it. If they're chill, be chill. If they're confused, help them but roast them a little first. If they say hi, don't just say hi back — give them something to react to.
+
 The user says: ${text}`;
       
       if (typeof window !== "undefined" && (window as any).puter) {
@@ -458,7 +526,7 @@ The user says: ${text}`;
                   id: `bee_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
                   sender_id: "bee_ai_bot",
                   sender_username: "bee",
-                  sender_avatar: "https://api.dicebear.com/7.x/bottts/svg?seed=bee&backgroundColor=fde047",
+                  sender_avatar: "/bee_avatar.png",
                   recipient_id: myUserId,
                   text: msgTxt,
                   timestamp: Date.now(),
@@ -477,7 +545,7 @@ The user says: ${text}`;
                 if (index === messages.length - 1) {
                   setPeerTyping((prev) => ({ ...prev, bee_ai_bot: false }));
                 }
-              }, index * 1500); 
+              }, index * 1000); 
             });
           })
           .catch(() => {
@@ -498,12 +566,8 @@ The user says: ${text}`;
   }, [socket]);
 
   const requestDMHistory = useCallback((targetUserId: string) => {
-    if (targetUserId === "bee_ai_bot") return;
-    if (socket?.requestDMHistory) {
-      setIsLoadingHistory(true);
-      socket.requestDMHistory(targetUserId);
-    }
-  }, [socket]);
+    // Deprecated: no-op since history is loaded from localStorage locally
+  }, []);
 
   const socialValue = useMemo(() => ({
     chatRequests,

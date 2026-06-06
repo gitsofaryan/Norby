@@ -42,11 +42,8 @@ export async function fetchOSRMRoute(
 
   if (mode === "foot") {
     durationSeconds = distanceMeters / 1.38;
-    // Walking paths are often slightly more direct than driving roads
-    distanceMeters = distanceMeters * 0.95;
   } else if (mode === "bicycle") {
     durationSeconds = distanceMeters / 4.16;
-    distanceMeters = distanceMeters * 0.98;
   }
 
   return {

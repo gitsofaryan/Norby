@@ -125,17 +125,6 @@ export function useOSM(
     debounceTimerRef.current = setTimeout(() => {
     abortControllerRef.current = new AbortController();
 
-    // Query Overpass API for amenities, leisure, and tourism within the rounded bounding box
-    const query = `
-      [out:json][timeout:5];
-      (
-        node["amenity"](${cacheS},${cacheW},${cacheN},${cacheE});
-        node["leisure"](${cacheS},${cacheW},${cacheN},${cacheE});
-        node["tourism"](${cacheS},${cacheW},${cacheN},${cacheE});
-      );
-      out body;
-    `;
-
     const url = `/api/osm?s=${cacheS}&w=${cacheW}&n=${cacheN}&e=${cacheE}`;
 
     fetch(url, { signal: abortControllerRef.current.signal })

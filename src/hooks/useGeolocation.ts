@@ -110,7 +110,23 @@ export function useGeolocation(maskLocation: boolean = true) {
     return null;
   });
 
-  const [status, setStatus] = useState<"waiting" | "granted" | "denied">("waiting");
+  const [status, setStatusState] = useState<"waiting" | "granted" | "denied">("waiting");
+  const statusRef = useRef(status);
+  statusRef.current = status;
+
+  const setStatus = (val: "waiting" | "granted" | "denied" | ((prev: "waiting" | "granted" | "denied") => "waiting" | "granted" | "denied")) => {
+    if (typeof val === "function") {
+      setStatusState((prev) => {
+        const next = val(prev);
+        statusRef.current = next;
+        return next;
+      });
+    } else {
+      statusRef.current = val;
+      setStatusState(val);
+    }
+  };
+
   const [isStasis, setIsStasis] = useState(false);
   const [accuracy, setAccuracy] = useState<number | null>(null);
   const [accuracySource, setAccuracySource] = useState<"gps-high" | "gps-low" | "ip-fallback" | "offline" | "waiting">("waiting");
@@ -217,7 +233,7 @@ export function useGeolocation(maskLocation: boolean = true) {
         () => {
           finished = true;
           setStatus((prev) => (prev === "granted" ? "granted" : "denied"));
-          if (status !== "granted") {
+          if (statusRef.current !== "granted") {
             setAccuracySource("offline");
           }
         },

@@ -74,6 +74,7 @@ export function useSocket({
   const [offlineMessages, setOfflineMessagesState] = useState<any[]>([]);
   const socketRef = useRef<WebSocket | null>(null);
   const offlineMessagesRef = useRef<any[]>([]);
+  const outgoingQueueRef = useRef<any[]>([]);
   const lastSentTimeRef = useRef<number>(0);
   const [connectionFailed, setConnectionFailed] = useState(false);
 
@@ -280,6 +281,16 @@ export function useSocket({
           sendLocationUpdate();
           activeWs.send(JSON.stringify({ type: "request_chats", user_id: userId }));
 
+          // Flush general queued messages (BUG-04)
+          if (outgoingQueueRef.current.length > 0) {
+            console.log(`[norby] Socket opened. Flushing ${outgoingQueueRef.current.length} queued outgoing messages...`);
+            outgoingQueueRef.current.forEach((data) => {
+              if (data.type === "location_update" || data.type === "request_chats" || data.type === "request_sync") return;
+              activeWs.send(JSON.stringify(data));
+            });
+            outgoingQueueRef.current = [];
+          }
+
           // Flush offline messages
           if (offlineMessagesRef.current.length > 0) {
             console.log(`[norby] Offline outbox has ${offlineMessagesRef.current.length} messages. Flushing...`);
@@ -461,6 +472,9 @@ export function useSocket({
       ws.send(JSON.stringify(data));
       return true;
     }
+    // BUG-04: Queue outgoing messages during reconnection window
+    console.log(`[norby] Socket not open. Queueing outgoing message of type: ${data?.type}`);
+    outgoingQueueRef.current.push(data);
     return false;
   };
 
@@ -526,15 +540,9 @@ export function useSocket({
   };
 
   const sendMessage = (roomId: string, text: string, onOptimisticAdd?: (msg: any) => void) => {
-    // Client-side XSS tag escaping
-    const sanitizedText = text
-      .trim()
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
-
     const ws = socketRef.current;
     const isSocketConnected = ws && ws.readyState === WebSocket.OPEN;
+    const trimmedText = text.trim();
 
     if (!isSocketConnected) {
       // Local optimistic message object
@@ -543,7 +551,7 @@ export function useSocket({
         sender_id: userId,
         sender_username: handle,
         sender_avatar: avatarUrl,
-        text: sanitizedText,
+        text: trimmedText,
         timestamp: Date.now(),
         isOffline: true,
       };
@@ -563,7 +571,7 @@ export function useSocket({
       JSON.stringify({
         type: "send_message",
         roomId,
-        text: sanitizedText,
+        text: trimmedText,
         sender_id: userId,
         sender_username: handle,
         sender_avatar: avatarUrl,
@@ -588,15 +596,10 @@ export function useSocket({
   };
 
   const sendDirectMessage = (recipientId: string, text: string) => {
-    const sanitizedText = text
-      .trim()
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
     return send({
       type: "send_direct_message",
       recipient_id: recipientId,
-      text: sanitizedText,
+      text: text.trim(),
     });
   };
 
@@ -614,12 +617,7 @@ export function useSocket({
     });
   };
 
-  const requestDMHistory = (targetUserId: string) => {
-    return send({
-      type: "request_dm_history",
-      target_user_id: targetUserId,
-    });
-  };
+
 
   const sendRtcOffer = (targetUserId: string, offer: any) => {
     return send({
@@ -692,7 +690,6 @@ export function useSocket({
     sendDirectMessage,
     sendTypingState,
     requestChats,
-    requestDMHistory,
     sendRtcOffer,
     sendRtcAnswer,
     sendRtcIceCandidate,

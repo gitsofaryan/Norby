@@ -26,6 +26,18 @@ class EventBus {
       }
     });
   }
+
+  clear(event?: string) {
+    if (event) {
+      delete this.listeners[event];
+    } else {
+      this.listeners = {};
+    }
+  }
+
+  listenerCount(event: string): number {
+    return this.listeners[event] ? this.listeners[event].length : 0;
+  }
 }
 
 export const globalEventBus = new EventBus();
