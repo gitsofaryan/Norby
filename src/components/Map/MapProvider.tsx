@@ -1174,6 +1174,8 @@ export function MapProvider({ children }: { children: React.ReactNode }) {
         setNotifications={setNotifications}
         activeUsers={activeUsers}
         isSignedIn={isSignedIn}
+        location={location}
+        filteredHotspots={filteredHotspots}
       >
         {children}
       </ChatProvider>

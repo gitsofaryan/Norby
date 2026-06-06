@@ -82,7 +82,9 @@ export function ChatProvider({
   addToast,
   setNotifications,
   activeUsers,
-  isSignedIn
+  isSignedIn,
+  location,
+  filteredHotspots
 }: { 
   children: React.ReactNode;
   socket: any;
@@ -93,6 +95,8 @@ export function ChatProvider({
   setNotifications: React.Dispatch<React.SetStateAction<any[]>>;
   activeUsers: any[];
   isSignedIn: boolean;
+  location?: { lat: number; lng: number } | null;
+  filteredHotspots?: any[];
 }) {
   const [chatRequests, setChatRequests] = useState<any[]>([]);
   const [activeChatUser, _setActiveChatUser] = useState<any | null>(null);
@@ -471,6 +475,29 @@ export function ChatProvider({
     
     if (chatUser.user_id === "bee_ai_bot") {
       setPeerTyping((prev) => ({ ...prev, bee_ai_bot: true }));
+
+      let mapContextText = "";
+      if (location) {
+        mapContextText += `• User location coordinates: Lat ${location.lat.toFixed(5)}, Lng ${location.lng.toFixed(5)}\n`;
+      } else {
+        mapContextText += `• User location coordinates: Unknown / waiting for GPS\n`;
+      }
+
+      if (filteredHotspots && filteredHotspots.length > 0) {
+        const hotspotList = filteredHotspots.slice(0, 3).map((h: any) => `"${h.title}"`).join(", ");
+        mapContextText += `• Active hotspots nearby: ${hotspotList}\n`;
+      } else {
+        mapContextText += `• Active hotspots nearby: None currently active\n`;
+      }
+
+      const otherUsers = activeUsers.filter((u: any) => u.user_id !== "bee_ai_bot" && u.user_id !== myUserId);
+      if (otherUsers.length > 0) {
+        const userList = otherUsers.slice(0, 5).map((u: any) => `${u.username} (vibe: ${u.vibeEmoji || "☕"})`).join(", ");
+        mapContextText += `• Active users online: ${userList}\n`;
+      } else {
+        mapContextText += `• Active users online: None (just the user and you)\n`;
+      }
+
       const prompt = `You are **Bee** 🐝 — the sarcastic, unhinged, but secretly wholesome AI that lives inside the Norby app.
 
 ## YOUR PERSONALITY
@@ -491,7 +518,12 @@ You know EVERYTHING about Norby and you're weirdly proud of it:
 • **Map markers** 📍 — user pins on the map.
 • **Buzz zone** — high activity areas.
 • **Chat requests** — stranger matching.
-When someone asks about Norby features, explain them briefly with personality.
+When someone asks about Norby features or map status, explain them briefly with personality.
+
+## CURRENT LIVE MAP INFO
+Here is the real-time state of the map/radar:
+${mapContextText}
+Use this data to answer questions about who is online, where they are, or what hotspots exist nearby.
 
 ## FORMAT RULES
 • Use Markdown for formatting. Do NOT use hyphens ( - ) anywhere.
