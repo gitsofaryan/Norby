@@ -890,7 +890,15 @@ export default function ChatPage() {
                                         : "bg-white border border-zinc-200/60 text-zinc-900 rounded-tl-none font-medium"
                                     }`}
                                   >
-                                    {m.text}
+                                    <ReactMarkdown
+                                      components={{
+                                        img: ({node, ...props}) => <img style={{maxWidth: '100%', borderRadius: '8px', marginTop: '8px'}} {...props} />,
+                                        p: ({node, ...props}) => <p style={{margin: 0}} {...props} />,
+                                        a: ({node, ...props}) => <a style={{textDecoration: 'underline'}} target="_blank" rel="noopener noreferrer" {...props} />
+                                      }}
+                                    >
+                                      {m.text}
+                                    </ReactMarkdown>
                                   </div>
                                   <span className="text-[8px] md:text-[9px] text-zinc-400 mt-1 px-1 font-bold">
                                     {timeStr}
