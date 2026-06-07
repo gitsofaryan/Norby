@@ -1,187 +1,153 @@
 # Norby 🗺️
 
 <p align="center">
-  <img src="public/pitch-mockup.jpg" alt="Norby Promo Mockup" width="400" />
+  <img src="public/pitch-mockup.jpg" alt="Norby Promo Mockup" width="600" style="border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);" />
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Next.js-16-black?style=for-the-badge&logo=next.js" alt="Next.js" />
+  <img src="https://img.shields.io/badge/TypeScript-5-blue?style=for-the-badge&logo=typescript" alt="TypeScript" />
+  <img src="https://img.shields.io/badge/Tailwind_CSS-4-38B2AC?style=for-the-badge&logo=tailwind-css" alt="Tailwind" />
+  <img src="https://img.shields.io/badge/Redis-Cache-DC382D?style=for-the-badge&logo=redis" alt="Redis" />
+  <img src="https://img.shields.io/badge/WebRTC-Audio-green?style=for-the-badge&logo=webrtc" alt="WebRTC" />
 </p>
 
 > **Stop scrolling. Start meeting. Connect with your neighborhood in real-time.**
 
-Norby is a hyper-local, real-time social discovery platform designed to cure digital isolation and bring neighborhoods together.
+Norby is a hyper-local, privacy-first, real-time social discovery platform designed to cure digital isolation by bringing neighborhoods together through ephemeral coordination. 
 
 ---
 
-### ☕ The Core Purpose: Curing Solitude in Real-Time
-Imagine you're sitting at home or in a local cafe, wanting to grab a cup of tea or coffee, but none of your friends are free. Or maybe you're new to the area and don't know anyone yet. Instead of endlessly scrolling through social feeds of distant influencers, you open **Norby**.
+## ☕ The Core Purpose: Curing Solitude in Real-Time
 
-With one tap, you drop a **Hotspot Room** at your location (e.g., *Tea & Conversation ☕*). Immediately, nearby neighbors see your hotspot on their live map. They request to join, you accept, and within minutes, you're chatting and meeting up in person. 
+Existing social networks connect us to the *world* but disconnect us from our *immediate surroundings*. Norby bridges the gap by focusing purely on physical proximity and real-world meetups. 
 
-No matches, no algorithmic feeds, no endless chatting online. Just real people, in real physical proximity, connecting over real-life activities.
+Imagine sitting at a local coffee shop wanting to play chess, study, or grab a drink, but none of your contacts are free. Instead of scrolling social feeds, you open **Norby**:
+1. You see other active neighbors on your live radar.
+2. You drop a **Hotspot Room** at your location (e.g., *“Chess & Coffee ☕”*).
+3. Nearby users see your hotspot, request to join, and chat to coordinate.
+4. Within minutes, you meet up in person. An hour later, the chat history vanishes completely.
 
 ---
 
-### 💡 The Pitch
-Digital connectivity is at an all-time high, yet human loneliness is a global epidemic. Existing social networks connect us to the *world*, but disconnect us from our *immediate surroundings*. 
+## ✨ Key Features
 
-**Norby bridges the gap between digital discovery and real-world meeting.**
-* **Zero-Friction Interactions**: No profile creation barriers. Generate a secure, anonymous handle in one second and start discovering immediately.
-* **Instant Social Broadcast (Hotspots)**: Drop a marker on the map to signal your availability for tea, sports, studying, or jamming.
-* **Privacy-Centric Location Masking**: Never broadcasts your exact GPS position; uses stable grid offsets to keep you safe while remaining discoverable.
-* **Low-Latency Live Roster**: Optimized WebSocket synchronization keeps the neighborhood map active and dynamic with zero battery drain.
+### 📍 Hyper-Local Live Map
+* **Interactive Radar**: Integrates React Leaflet for interactive map rendering. Shows nearby users and group hotspots within your custom radar range (e.g., 5km to 25km).
+* **Vibe Emojis & Custom Profiles**: Choose an avatar, write a short bio, pick interest tags (e.g. `coding`, `music`, `coffee`), and set a dynamic vibe emoji that displays directly on your map pin.
+
+### 🔥 Ephemeral Hotspots (Group Spaces)
+* **Join Requests & Host Moderation**: Hotspots are private by default. Strangers request access, and the host approves or declines them.
+* **Transient Chatrooms**: Secure coordinates chatroom automatically created for members. All messages vanish 1 hour after transmission.
+* **Walk Navigation Routing**: Calculates walking/driving distance, ETA, and draws an interactive route line on the map using OpenStreetMap routing engines.
+* **Physical Meetup Safety & SOS**: Provides safety checklists and a one-tap GPS SOS share button to send your live coordinates to trusted contacts when meeting in person.
+
+### 🎙️ WebRTC Voice Call Infrastructure
+* **1-to-1 Calls**: Low-latency peer-to-peer voice calling directly inside direct messages. Includes ringtone audio and clean floating caller widgets.
+* **Live Audio Spaces**: Hosts can start spatial audio broadcasts in Hotspot Rooms. Participants can request to speak, and hosts can manage speaking permissions in real time.
+
+### 🐝 Bee: The Resident AI Guide
+* **Smart Guide**: Bee (`bee_ai_bot`) is a witty, sarcastic Gen-Z AI companion powered by `openai/gpt-4o-mini` via Puter AI.
+* **Gated Map Awareness**: Bee has access to coordinates, nearby active hotspots, and active users. She is strictly gated to *only* share this information if you explicitly ask, keeping normal chat bubbles natural.
+* **On-Demand Image Generation**: Generates images from Unsplash or avatars from Dicebear using clean markdown formatting when asked.
+
+### 🛡️ Privacy-First Engineering
+* **Stable Grid Offset Masking**: Protects exact locations by deterministic shifting. It keeps your house number hidden in a 500m cell size while rendering a stable pin.
+* **GPS Battery-Saver Stasis Loop**: Suspends active GPS polling if you stay in the same place for 3 minutes, saving battery life. Instantly wakes up on map interaction or physical movement.
+
+---
+
+## 🗺️ Real-World Walkthrough
+
+Let's trace how two neighbors, **Aria** and **Liam**, connect for a coding session:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Aria as Aria (Host)
+    actor Liam as Liam (Guest)
+    participant Server as WebSocket Server
+    participant Redis as Redis Cache
+
+    Aria->>Server: Create Hotspot "Code & Coffee ☕"
+    Server->>Redis: Store Hotspot Lat/Lng (Set expiration to 2h)
+    Server-->>Liam: Broadcast new Hotspot on Radar Map
+    Liam->>Server: Request to Join Hotspot
+    Server-->>Aria: Show "Liam wants to join" Join Request toast
+    Aria->>Server: Approve Liam's request
+    Server-->>Liam: Unlock Hotspot Chatroom & Route
+    Liam->>Server: Start voice call (WebRTC) to coordinate table location
+    Server->>Liam: Handshake WebRTC signaling
+    Aria->>Liam: "Hey! I'm by the window in the green hoodie."
+    Note over Aria,Liam: Meet in person, code together!
+    Note over Redis: Hotspot expires, all chat messages deleted from Redis
+```
 
 ---
 
 ## 🏗️ System Architecture
 
-Norby is split into three main parts: an optimized Next.js frontend, a standalone WebSocket coordination server, and a high-performance Redis cache database.
+Norby utilizes a decoupled frontend client, a standalone WebSocket signaling server, and a high-performance Redis cache layer.
 
 ```mermaid
 graph TD
-    Client[Next.js Client] <-->|WebSockets JSON| Server[Node.js WebSocket Server]
+    Client[Next.js Client App] <-->|WebSockets JSON| Server[Node.js WebSocket Server]
     Server <-->|Geo Queries & Hashes| Redis[(Redis Pub/Sub & KV)]
     Client -->|OSM Places Queries| Overpass[Overpass OSM API]
-    Client -->|IP Location Backup| FreeIP[FreeIP / IPWhois APIs]
+    Client -->|Walking Routes| OSRM[OSRM Routing Server]
 ```
 
-### 1. Frontend: Next.js Client
-* **Proximity Radar (`LiveMap.tsx`)**: Integrates React Leaflet for interactive map rendering, custom user indicators, and live hotspot markers.
-* **State Manager (`MapProvider.tsx`)**: Governs authentication context, coordinates, notifications, typing indicators, active routes, and active microphone signallers.
-* **Geolocation Driver (`useGeolocation.ts`)**: Handles browser GPS tracking, cached coordinates, battery-saver stasis modes, and city-level IP fallbacks.
-* **Socket Connector (`useSocket.ts`)**: Manages the persistent WebSocket lifecycle, reconnection backoffs with jitter, offline outbox caching, and event routing.
+### 1. Database Schema (Redis Keys)
+* `norby:user_locations` (Sorted Set / Geohash): Holds geolocation indices of all active users.
+* `norby:active_users` (Hash): Stores serialized user profiles mapped by `user_id`.
+* `norby:hotspots` (Hash): Stores active hotspot properties, host details, and guest rosters.
 
-### 2. Backend: WebSocket Coordinator (`socket-server.ts`)
-* **Message Router**: Handles incoming client events, validates schemas using Zod, and routes messages to local connections or Redis Pub/Sub channels.
-* **State Synchronizer**: Throttle-controlled sync scheduler sending updates to clients at most once every 3 seconds to prevent client layout lagging and Redis hammering.
-* **Background Maintenance**: Runs asynchronous cleanup routines off the client critical path to keep Redis memory footprint minimal.
-
-### 3. Database: Redis Cache Layer
-* **Geo-spatial Indices (`norby:user_locations`)**: A Redis Sorted Set managing active coordinates. Allows instant city-wide geo-queries.
-* **Roster Hashes (`norby:active_users`)**: Stores serialized JSON payloads containing active user handles, vibes, avatars, tags, and heartbeat timestamps.
-* **Hotspot Spaces (`norby:hotspots`)**: Tracks open meetups, join requests, accepted guest IDs, and transient message histories.
-
----
-
-## ⚡ Core Protocols & Algorithms
-
-### 1. Geolocation Racing & Stable Offset Masking
-To prevent the map from collapsing on launch and protect user privacy:
-1. **Racing Mode**: On mount, the client calls `getIPLocation()` and `navigator.geolocation.getCurrentPosition()` simultaneously. The first to resolve sets the map center, ensuring a <200ms initial render.
-2. **Stable Grid Masking**: User locations are masked using a deterministic grid offset algorithm:
-   ```typescript
-   const gridScale = 0.0045; // ~500m grid cell boundaries
-   const cellLat = Math.floor(actualLat / gridScale);
-   const cellLng = Math.floor(actualLng / gridScale);
-   const seed = (cellLat * 73856093) ^ (cellLng * 19349663);
-   const offset = (Math.abs(Math.sin(seed) * 1000) % 1) - 0.5;
-   ```
-   This ensures the coordinate offset remains identical while the user is stationary within their neighborhood grid, preventing marker jittering, but keeps their exact street address hidden.
-
-### 2. Battery-Saver GPS Stasis Loop
-To prevent mobile device battery drainage from continuous GPS tracking:
-* If the user's GPS coordinates shift by less than 3 meters for 3 minutes, the client clears the high-power GPS watch interval and switches to a low-power passive poll (running every 2 minutes).
-* **Wakeup Trigger**: The second a click, touch, map pan, or movement (>5m) is detected, the app wakes up and instantly restores the high-power active GPS watch.
-
-### 3. Ultra-Fast WebSocket Sync (0.5ms latency)
-* Client location updates and radar fetches are combined into a single roundtrip.
-* Instead of running database existence pipelines per user during active sync, the server executes a single batch `hmGet` query for all nearby IDs.
-* Disconnected or idle users are filtered in-memory:
-  ```typescript
-  const isAlive = Date.now() - (user.last_seen || 0) <= 45000; // 45s cutoff
-  ```
-
-### 4. Background Sweeper (Zombie Cleanup)
-* Instead of database pruning on client-facing threads, a background worker runs every **30 seconds** on the server.
-* It checks the `last_seen` timestamp of all active user records and purges expired entries asynchronously using a Redis pipeline (`zRem`, `hDel`).
-
-### 5. Input Sanitization & XSS Prevention
-* All public inputs (chat messages, custom bios, hotspot names) are automatically HTML-entity encoded before storage and rendering to prevent Cross-Site Scripting (XSS) attacks:
-  ```typescript
-  function sanitizeInput(input: string): string {
-    return input
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#x27;")
-      .replace(/\//g, "&#x2F;");
-  }
-  ```
-
----
-
-## 📡 WebSocket Protocol Reference
-
-### Client-to-Server Payloads
-All payloads are Zod-validated JSON strings with a matching `type` parameter:
-
-* `location_update`: Sent every 30s or on pan/move to broadcast presence.
-  ```json
-  {
-    "type": "location_update",
-    "user_id": "user_123",
-    "username": "NeonNomad",
-    "lat": 28.6139,
-    "lng": 77.209,
-    "bio": "Jamming alt records",
-    "radarRange": 15
-  }
-  ```
-* `create_hotspot`: Spawn a new local social room.
-  ```json
-  {
-    "type": "create_hotspot",
-    "user_id": "user_123",
-    "username": "NeonNomad",
-    "title": "Matcha Coffee Grind",
-    "lat": 28.6139,
-    "lng": 77.209,
-    "hotspotRange": 15
-  }
-  ```
-* `send_direct_message`: Ephemeral direct messaging.
-  ```json
-  {
-    "type": "send_direct_message",
-    "recipient_id": "target_user_456",
-    "text": "Heading to the cafe!"
-  }
-  ```
+### 2. Throttled Signaling Protocol
+To prevent UI lagging and server hammering, the server schedules coordinate broadcasts at a static **3-second cycle**. Location updates are stored immediately in Redis, and batch frames are sent down to active connections.
 
 ---
 
 ## 🚀 Getting Started
 
-### 1. Setup Local Environment
-Clone the repository, install packages, and initialize variables:
+### Prerequisites
+* **Node.js** (v18 or higher)
+* **Redis** (local instance or cloud Redis server)
+
+### 1. Setup Environment
+Clone the repository and install dependencies:
 ```bash
 git clone https://github.com/gitsofaryan/norby.git
 cd norby
 npm install
 ```
 
-Create a `.env.local` in the root:
+Create a `.env.local` file in the root directory:
 ```env
 NEXT_PUBLIC_WS_URL=ws://localhost:3001
+REDIS_URL=redis://localhost:6379
 ```
 
-### 2. Launch Dev Servers
-Start the Next.js app and the WebSocket server simultaneously:
+### 2. Launch Services
+Start the Next.js frontend and the WebSocket backend concurrently:
 ```bash
 npm run dev
 ```
 
-* **Frontend App**: [http://localhost:3000](http://localhost:3000)
-* **WebSocket Port**: `http://localhost:3001`
+* **Frontend Dashboard**: [http://localhost:3000](http://localhost:3000)
+* **WebSocket Server**: Running on port `3001`
+
+### 3. Running Test Suites
+Norby uses Vitest for unit and integration testing:
+```bash
+npm run test:run
+```
 
 ---
 
 ## 🤝 Contributing & Bounty Program
 
-We welcome contributions from the community! Whether you are fixing bugs, developing features, or updating documentation, we want your help to make Norby even better.
+We welcome contributions from the developer community! 
 
 > [!TIP]
-> ### 🎁 Get Rewarded for Your Work
-> **Meaningful contributions will be rewarded up to ₹250!**
-> Pull requests that provide high-value enhancements (such as bug fixes, performance improvements, doc clarity, or new features) are eligible for bounty payouts. Only clean, meaningful contributions will be counted.
-
-For details on coding guidelines, branch naming conventions, and checklist criteria, see our [Contributor Guide](CONTRIBUTING.md).
-
+> ### 🎁 Pull Request Bounties
+> Pull requests that fix high-impact bugs, improve geolocation caching, or add voice filtering are eligible for rewards up to **₹250** per merged PR. Read [CONTRIBUTING.md](CONTRIBUTING.md) for full guidelines.
