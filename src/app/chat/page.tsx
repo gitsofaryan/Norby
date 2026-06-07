@@ -18,11 +18,13 @@ import {
   Loader2,
   Trash2,
   Lock,
-  LogOut
+  LogOut,
+  Compass
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import ReactMarkdown from "react-markdown";
+import Link from "next/link";
 
 export default function ChatPage() {
   const router = useRouter();
@@ -172,7 +174,16 @@ export default function ChatPage() {
         >
           {/* Header */}
           <div className="p-6 border-b border-zinc-100 flex flex-col gap-4">
-            <h1 className="text-2xl font-black tracking-tight text-zinc-900">Messages</h1>
+            <div className="flex justify-between items-center">
+              <h1 className="text-2xl font-black tracking-tight text-zinc-900">Messages</h1>
+              <Link
+                href="/"
+                className="hidden md:flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-zinc-200/80 bg-white text-zinc-700 hover:text-zinc-900 hover:bg-zinc-50 active:scale-95 transition-all text-[10px] font-black uppercase tracking-wider shadow-sm cursor-pointer"
+              >
+                <Compass className="w-3.5 h-3.5" />
+                Map
+              </Link>
+            </div>
 
             {/* Tabs */}
             <div className="flex bg-zinc-100/80 p-1 rounded-xl border border-zinc-200/50">
@@ -1031,9 +1042,16 @@ export default function ChatPage() {
                 <MessageSquare className="w-8 h-8 text-zinc-300" />
               </div>
               <h3 className="text-base font-bold text-zinc-700 mb-1">Select a Conversation</h3>
-              <p className="text-xs text-zinc-400 max-w-xs leading-normal">
+              <p className="text-xs text-zinc-400 max-w-xs leading-normal mb-6">
                 Choose a contact or hotspot from the list to start exchanging end-to-end 1-hour self-destructing messages.
               </p>
+              <Link
+                href="/"
+                className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-zinc-900 hover:bg-black text-white text-xs font-bold transition-all shadow-md cursor-pointer active:scale-95"
+              >
+                <Compass className="w-4 h-4" />
+                Back to Map
+              </Link>
             </div>
           )}
         </div>
