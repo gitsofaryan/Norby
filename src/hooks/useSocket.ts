@@ -278,7 +278,7 @@ export function useSocket({
 
         const activeWs = ws;
         if (activeWs) {
-          sendLocationUpdate();
+          sendLocationUpdate(true);
           activeWs.send(JSON.stringify({ type: "request_chats", user_id: userId }));
 
           // Flush general queued messages (BUG-04)
