@@ -32,8 +32,8 @@ function MapController({
   setIsInteracting,
   setBounds,
 }: {
-  lat: number;
-  lng: number;
+  lat: number | null;
+  lng: number | null;
   trigger: number;
   followUser: boolean;
   setFollowUser: (val: boolean) => void;
@@ -90,13 +90,14 @@ function MapController({
   }, [map, setFollowUser, setIsInteracting]);
 
   useEffect(() => {
-    if (followUser) {
+    if (followUser && lat !== null && lng !== null) {
       map.panTo([lat, lng], { animate: true, duration: 0.5 });
       setTimeout(() => setBounds(map.getBounds()), 600);
     }
   }, [lat, lng, followUser, map, setBounds]);
 
   useEffect(() => {
+    if (lat === null || lng === null) return;
     map.flyTo([lat, lng], map.getZoom(), { animate: true, duration: 0.8 });
     setTimeout(() => setBounds(map.getBounds()), 900);
   }, [trigger, map, lat, lng, setBounds]);
@@ -349,9 +350,6 @@ function LiveMapContent() {
     return list;
   }, [filteredUsers, filteredHotspots, location?.lat, location?.lng, zoom, bounds]);
 
-  const MAP_FALLBACK = { lat: 28.6139, lng: 77.209 }; // New Delhi fallback
-  const activeLocation = location || MAP_FALLBACK;
-
   return (
     <div className="absolute inset-0">
       <AnimatePresence>
@@ -375,7 +373,8 @@ function LiveMapContent() {
         )}
       </AnimatePresence>
       <MapContainer
-        center={[activeLocation.lat, activeLocation.lng]}
+        // Neutral initial view only; it is never treated as the user's location.
+        center={[location?.lat ?? 0, location?.lng ?? 0]}
         zoom={15}
         style={{ height: "100%", width: "100%" }}
         zoomControl={false}
@@ -385,8 +384,8 @@ function LiveMapContent() {
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
         <MapController
-          lat={activeLocation.lat}
-          lng={activeLocation.lng}
+          lat={location?.lat ?? null}
+          lng={location?.lng ?? null}
           trigger={recenterTrigger}
           followUser={followUser}
           setFollowUser={setFollowUser}
@@ -482,7 +481,7 @@ function LiveMapContent() {
 
       {/* Onboarding Spotlight Backdrop */}
       <AnimatePresence>
-        {onboardingStep !== null && (
+        {onboardingStep !== null && location && (
           <>
             {/* Transparent click blocker to prevent clicking underlying elements and messing up the tour state */}
             <div className="fixed inset-0 z-[1180] bg-transparent pointer-events-auto cursor-default" />
@@ -515,7 +514,7 @@ function LiveMapContent() {
 
       {/* Highlight Ring Overlay */}
       <AnimatePresence>
-        {onboardingStep !== null && highlightRect && (
+        {onboardingStep !== null && location && highlightRect && (
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{
@@ -547,7 +546,7 @@ function LiveMapContent() {
 
       {/* Onboarding Walkthrough Tooltip */}
       <AnimatePresence>
-        {onboardingStep !== null && (
+        {onboardingStep !== null && location && (
           <motion.div
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}

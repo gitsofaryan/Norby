@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useAuth, getAvatarUrl, UserProfile } from "@/hooks/useAuth";
 import { useGeolocation, getDistanceKm } from "@/hooks/useGeolocation";
+import type { GeolocationStatus } from "@/hooks/useGeolocation";
 import { useSocket } from "@/hooks/useSocket";
 import { useWebRTC } from "@/hooks/useWebRTC";
 import { fetchOSRMRoute, RouteData, TransportMode } from "@/lib/routing";
@@ -23,10 +24,10 @@ interface MapContextType {
 
   // Geolocation state
   location: { lat: number; lng: number } | null;
-  locStatus: "waiting" | "granted" | "denied";
+  locStatus: GeolocationStatus;
   isStasis: boolean;
   accuracy: number | null;
-  accuracySource: "gps-high" | "gps-low" | "ip-fallback" | "offline" | "waiting";
+  accuracySource: "gps-high" | "gps-low" | "offline" | "waiting";
   locationEnabled: boolean;
   requestLocation: () => void;
   disableLocation: () => void;
@@ -287,6 +288,7 @@ export function MapProvider({ children }: { children: React.ReactNode }) {
   const maskLocation = profile?.maskLocation ?? true;
   const {
     location,
+    sharedLocation,
     status: locStatus,
     isStasis,
     accuracy,
@@ -439,7 +441,7 @@ export function MapProvider({ children }: { children: React.ReactNode }) {
     handle,
     vibeEmoji,
     avatarUrl: myAvatarUrl,
-    location,
+    location: sharedLocation,
     profile,
     localBlocks,
     isBroadcastingAudio: webRTC.isBroadcastingAudio && webRTC.isSpaceHost,

@@ -1,17 +1,28 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 const LOCATION_ENABLED_KEY = "norby_location_enabled";
+const LOCATION_DENIED_KEY = "norby_location_denied";
 
-// Helper to calculate distance in km using Haversine formula
+export type GeolocationStatus =
+  | "waiting"
+  | "requesting"
+  | "granted"
+  | "denied"
+  | "unavailable"
+  | "insecure"
+  | "timeout";
+
+export type Coordinates = { lat: number; lng: number };
+
 export function getDistanceKm(
   lat1: number,
   lon1: number,
   lat2: number,
   lon2: number,
 ): number {
-  const R = 6371; // Radius of the Earth in km
+  const R = 6371;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
   const dLon = ((lon2 - lon1) * Math.PI) / 180;
   const a =
@@ -20,501 +31,254 @@ export function getDistanceKm(
       Math.cos((lat2 * Math.PI) / 180) *
       Math.sin(dLon / 2) *
       Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+/** Stable displacement used only for the location shared with other users. */
 export function getStableOffset(actualLat: number, actualLng: number) {
-  const gridScale = 0.0045; // ~500m grid cell boundaries
+  const gridScale = 0.0045;
   const cellLat = Math.floor(actualLat / gridScale);
   const cellLng = Math.floor(actualLng / gridScale);
-
-  // Seed-based deterministic hashing to get a stable offset per grid cell
   const seed1 = (cellLat * 73856093) ^ (cellLng * 19349663);
-  const rand1 = (Math.abs(Math.sin(seed1) * 1000) % 1) - 0.5;
-  const latOffset = rand1 * 0.0018;
-
   const seed2 = (cellLat * 83492791) ^ (cellLng * 73856093);
-  const rand2 = (Math.abs(Math.sin(seed2) * 1000) % 1) - 0.5;
-  const lngOffset = rand2 * 0.0018;
 
-  return { latOffset, lngOffset };
+  return {
+    latOffset: ((Math.abs(Math.sin(seed1) * 1000) % 1) - 0.5) * 0.0018,
+    lngOffset: ((Math.abs(Math.sin(seed2) * 1000) % 1) - 0.5) * 0.0018,
+  };
 }
 
-async function getIPLocation(): Promise<{ lat: number; lng: number } | null> {
-  // Check sessionStorage cache first (10-min TTL)
-  if (typeof window !== "undefined") {
-    try {
-      const cached = sessionStorage.getItem("norby_ip_location");
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        if (parsed.expires > Date.now() && typeof parsed.lat === "number") {
-          return { lat: parsed.lat, lng: parsed.lng };
-        }
-      }
-    } catch (e) {
-      /* ignore */
-    }
-  }
+function getStatusFromError(error: GeolocationPositionError): GeolocationStatus {
+  if (error.code === error.PERMISSION_DENIED) return "denied";
+  if (error.code === error.TIMEOUT) return "timeout";
+  return "unavailable";
+}
 
-  let result: { lat: number; lng: number } | null = null;
-
+function getInitialEnabledState() {
+  if (typeof window === "undefined") return false;
   try {
-    const res = await fetch("https://freeipapi.com/api/json");
-    if (res.ok) {
-      const data = await res.json();
-      if (
-        typeof data.latitude === "number" &&
-        typeof data.longitude === "number"
-      ) {
-        result = { lat: data.latitude, lng: data.longitude };
-      }
-    }
-  } catch (err) {
-    // Try backup
+    return localStorage.getItem(LOCATION_ENABLED_KEY) === "true";
+  } catch {
+    return false;
   }
-
-  if (!result) {
-    try {
-      const res = await fetch("https://ipwho.is/");
-      if (res.ok) {
-        const data = await res.json();
-        if (
-          typeof data.latitude === "number" &&
-          typeof data.longitude === "number"
-        ) {
-          result = { lat: data.latitude, lng: data.longitude };
-        }
-      }
-    } catch (err) {
-      // Silent fallback
-    }
-  }
-
-  // Cache in sessionStorage for 10 minutes
-  if (result && typeof window !== "undefined") {
-    try {
-      sessionStorage.setItem(
-        "norby_ip_location",
-        JSON.stringify({
-          lat: result.lat,
-          lng: result.lng,
-          expires: Date.now() + 10 * 60 * 1000,
-        }),
-      );
-    } catch (e) {
-      /* ignore */
-    }
-  }
-
-  return result;
 }
 
-export function useGeolocation(maskLocation: boolean = true) {
-  const [location, setLocationState] = useState<{
-    lat: number;
-    lng: number;
-  } | null>(() => {
-    if (typeof window !== "undefined") {
-      if (localStorage.getItem(LOCATION_ENABLED_KEY) !== "true") return null;
-      const cached = localStorage.getItem("norby_last_location");
-      if (cached) {
-        try {
-          const parsed = JSON.parse(cached);
-          if (
-            typeof parsed.lat === "number" &&
-            typeof parsed.lng === "number"
-          ) {
-            return parsed;
-          }
-        } catch (e) {
-          // Ignore
-        }
-      }
-    }
-    return null;
-  });
-
-  const [status, setStatusState] = useState<"waiting" | "granted" | "denied">(
-    "waiting",
-  );
-  const [locationEnabled, setLocationEnabled] = useState(() => {
-    return (
-      typeof window !== "undefined" &&
-      localStorage.getItem(LOCATION_ENABLED_KEY) === "true"
-    );
-  });
-  const statusRef = useRef(status);
-  statusRef.current = status;
-
-  const setStatus = (
-    val:
-      | "waiting"
-      | "granted"
-      | "denied"
-      | ((
-          prev: "waiting" | "granted" | "denied",
-        ) => "waiting" | "granted" | "denied"),
-  ) => {
-    if (typeof val === "function") {
-      setStatusState((prev) => {
-        const next = val(prev);
-        statusRef.current = next;
-        return next;
-      });
-    } else {
-      statusRef.current = val;
-      setStatusState(val);
-    }
-  };
-
-  const [isStasis, setIsStasis] = useState(false);
+export function useGeolocation(maskLocation = true) {
+  const [location, setLocationState] = useState<Coordinates | null>(null);
+  const [status, setStatus] = useState<GeolocationStatus>("waiting");
+  const [locationEnabled, setLocationEnabled] = useState(getInitialEnabledState);
   const [accuracy, setAccuracy] = useState<number | null>(null);
+  const [isStasis, setIsStasis] = useState(false);
   const [accuracySource, setAccuracySource] = useState<
-    "gps-high" | "gps-low" | "ip-fallback" | "offline" | "waiting"
+    "gps-high" | "gps-low" | "offline" | "waiting"
   >("waiting");
-  const hasGPSRef = useRef(false);
-  const wakeFromStasisRef = useRef<(() => void) | null>(null);
+  const locationRef = useRef<Coordinates | null>(null);
+  const autoRequestStartedRef = useRef(false);
 
-  // Use refs to avoid re-running effects on location updates
-  const locationRef = useRef<{ lat: number; lng: number } | null>(location);
-  locationRef.current = location;
-
-  const setLocation = (newLoc: { lat: number; lng: number }) => {
-    setLocationState(newLoc);
-    if (typeof window !== "undefined") {
-      localStorage.setItem("norby_last_location", JSON.stringify(newLoc));
-    }
-  };
-
-  useEffect(() => {
-    if (!locationEnabled) {
-      setStatus("waiting");
-      setAccuracySource("waiting");
+  const acceptPosition = useCallback((position: GeolocationPosition) => {
+    const lat = position.coords.latitude;
+    const lng = position.coords.longitude;
+    if (
+      !Number.isFinite(lat) ||
+      !Number.isFinite(lng) ||
+      lat < -90 ||
+      lat > 90 ||
+      lng < -180 ||
+      lng > 180
+    ) {
+      setStatus("unavailable");
       return;
     }
 
-    let finished = false;
-    let watchId: number | null = null;
-    let passivePollInterval: ReturnType<typeof setInterval> | null = null;
-    let ipFallbackTimer: ReturnType<typeof setTimeout> | null = null;
+    const actualCoordinates = { lat, lng };
+    locationRef.current = actualCoordinates;
+    setLocationState(actualCoordinates);
+    setAccuracy(position.coords.accuracy);
+    setAccuracySource(position.coords.accuracy <= 200 ? "gps-high" : "gps-low");
+    setStatus("granted");
+  }, []);
 
-    let localIsStasis = false;
-    let lastMoveTime = Date.now();
-    let lastLatitude: number | null = null;
-    let lastLongitude: number | null = null;
+  const handlePositionError = useCallback((error: GeolocationPositionError) => {
+    // Keep the last real fix during a temporary GPS outage. Before the first
+    // fix, expose the failure so the existing map location control can retry.
+    if (locationRef.current) return;
 
-    // Give the device's cached GPS result a brief head start. IP geolocation is
-    // often city-level and should be a fallback, not the first map position.
-    ipFallbackTimer = setTimeout(() => {
-      getIPLocation()
-        .then((ipLoc) => {
-          if (!finished && ipLoc && !hasGPSRef.current && !locationRef.current) {
-            const offset = maskLocation
-              ? getStableOffset(ipLoc.lat, ipLoc.lng)
-              : { latOffset: 0, lngOffset: 0 };
-            setLocation({
-              lat: ipLoc.lat + offset.latOffset,
-              lng: ipLoc.lng + offset.lngOffset,
-            });
-            setStatus("granted");
-            setAccuracySource("ip-fallback");
-          }
-        })
-        .catch((err) => {
-          console.warn("IP Geolocation mount error:", err);
-        });
-    }, 1_500);
-
-    const startHighAccuracyWatch = () => {
-      if (watchId !== null) return;
-      if (passivePollInterval !== null) {
-        clearInterval(passivePollInterval);
-        passivePollInterval = null;
+    const nextStatus = getStatusFromError(error);
+    setStatus(nextStatus);
+    if (nextStatus === "unavailable" || nextStatus === "timeout") {
+      setAccuracySource("offline");
+    }
+    if (nextStatus === "denied") {
+      setLocationEnabled(false);
+      try {
+        localStorage.removeItem(LOCATION_ENABLED_KEY);
+        localStorage.setItem(LOCATION_DENIED_KEY, "true");
+      } catch {
+        // Storage can be unavailable in private browsing modes.
       }
-      localIsStasis = false;
-      setIsStasis(false);
-      lastMoveTime = Date.now();
+    }
+  }, []);
 
-      console.log("[norby] Starting high-power GPS watchPosition driver.");
-      watchId = navigator.geolocation.watchPosition(
-        (pos) => {
-          // Discard extremely inaccurate coordinates (e.g. > 5km) which often happen during poor signal
-          if (pos.coords.accuracy > 5000) {
-            console.log(
-              "[norby] Discarding low-accuracy GPS signal:",
-              pos.coords.accuracy,
-              "meters",
-            );
-            return;
-          }
-
-          finished = true;
-          hasGPSRef.current = true;
-          const lat = pos.coords.latitude;
-          const lng = pos.coords.longitude;
-          setAccuracy(pos.coords.accuracy);
-          setAccuracySource(
-            pos.coords.accuracy <= 200 ? "gps-high" : "gps-low",
-          );
-          const offset = maskLocation
-            ? getStableOffset(lat, lng)
-            : { latOffset: 0, lngOffset: 0 };
-          const newLat = lat + offset.latOffset;
-          const newLng = lng + offset.lngOffset;
-
-          const prev = locationRef.current;
-          if (!prev) {
-            lastLatitude = lat;
-            lastLongitude = lng;
-            setLocation({ lat: newLat, lng: newLng });
-            setStatus("granted");
-            return;
-          }
-
-          const dist = getDistanceKm(prev.lat, prev.lng, newLat, newLng);
-          if (dist > 0.003) {
-            // User is moving! Update coordinates & reset stasis timer
-            lastLatitude = lat;
-            lastLongitude = lng;
-            lastMoveTime = Date.now();
-            setLocation({ lat: newLat, lng: newLng });
-          } else {
-            // If user has been stationary for more than 3 minutes, transition to passive battery saver!
-            if (Date.now() - lastMoveTime > 180000 && !localIsStasis) {
-              console.log(
-                "[norby] User is stationary. Transitioning to low-power stasis GPS poll.",
-              );
-              localIsStasis = true;
-              setIsStasis(true);
-              switchToPassivePoll();
-            }
-          }
-          setStatus("granted");
-        },
-        () => {
-          finished = true;
-          setStatus((prev) => (prev === "granted" ? "granted" : "denied"));
-          if (statusRef.current !== "granted") {
-            setAccuracySource("offline");
-          }
-        },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
-      );
-    };
-
-    const switchToPassivePoll = () => {
-      if (watchId !== null) {
-        navigator.geolocation.clearWatch(watchId);
-        watchId = null;
+  const acquireDeviceLocation = useCallback((clearDenial = false) => {
+    if (clearDenial) {
+      try {
+        localStorage.removeItem(LOCATION_DENIED_KEY);
+      } catch {
+        // Storage can be unavailable in private browsing modes.
       }
-      if (passivePollInterval !== null) return;
-
-      // Poll low-power location every 2 minutes
-      passivePollInterval = setInterval(() => {
-        console.log("[norby] Low-power stasis GPS check-in.");
-        navigator.geolocation.getCurrentPosition(
-          (pos) => {
-            const lat = pos.coords.latitude;
-            const lng = pos.coords.longitude;
-            setAccuracy(pos.coords.accuracy);
-
-            if (lastLatitude !== null && lastLongitude !== null) {
-              const movedDist = getDistanceKm(
-                lastLatitude,
-                lastLongitude,
-                lat,
-                lng,
-              );
-              if (movedDist > 0.005) {
-                // User has started moving! Exit stasis and restore active high-power GPS watch
-                console.log(
-                  "[norby] Movement detected during stasis. Waking up high-power GPS watch.",
-                );
-                startHighAccuracyWatch();
-
-                const offset = maskLocation
-                  ? getStableOffset(lat, lng)
-                  : { latOffset: 0, lngOffset: 0 };
-                setLocation({
-                  lat: lat + offset.latOffset,
-                  lng: lng + offset.lngOffset,
-                });
-              }
-            } else {
-              lastLatitude = lat;
-              lastLongitude = lng;
-            }
-          },
-          () => {},
-          { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 },
-        );
-      }, 120000);
-    };
-
-    if (!navigator.geolocation) {
-      setStatus("denied");
+    }
+    if (typeof window !== "undefined" && window.isSecureContext === false) {
+      setStatus("insecure");
+      return;
+    }
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      setStatus("unavailable");
       setAccuracySource("offline");
       return;
     }
 
-    // Fast OS-level cached location for near-instant map loading
+    if (!locationRef.current) setStatus("requesting");
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        if (!finished && !hasGPSRef.current) {
-          hasGPSRef.current = true;
-          const offset = maskLocation
-            ? getStableOffset(pos.coords.latitude, pos.coords.longitude)
-            : { latOffset: 0, lngOffset: 0 };
-          const newLat = pos.coords.latitude + offset.latOffset;
-          const newLng = pos.coords.longitude + offset.lngOffset;
-          setLocation({ lat: newLat, lng: newLng });
-          setAccuracy(pos.coords.accuracy);
-          setAccuracySource(
-            pos.coords.accuracy <= 200 ? "gps-high" : "gps-low",
-          );
-          setStatus("granted");
+      (position) => {
+        acceptPosition(position);
+        setLocationEnabled(true);
+        try {
+          localStorage.setItem(LOCATION_ENABLED_KEY, "true");
+        } catch {
+          // The current session still works when storage is unavailable.
         }
       },
-      () => {}, // Ignore errors, watchPosition will handle it
-      { enableHighAccuracy: false, timeout: 2500, maximumAge: 60_000 },
+      handlePositionError,
+      { enableHighAccuracy: true, timeout: 20_000, maximumAge: 0 },
+    );
+  }, [acceptPosition, handlePositionError]);
+
+  const requestLocation = useCallback(() => {
+    acquireDeviceLocation(true);
+  }, [acquireDeviceLocation]);
+
+  // Make one native browser request on entry when location has not already
+  // been enabled. Remember denial so reloads do not repeatedly trigger it.
+  // The map's existing recenter control calls requestLocation for a user-led
+  // retry. Permission query is optional because Safari support varies.
+  useEffect(() => {
+    if (locationEnabled || autoRequestStartedRef.current) return;
+    autoRequestStartedRef.current = true;
+
+    try {
+      if (localStorage.getItem(LOCATION_DENIED_KEY) === "true") {
+        setStatus("denied");
+        return;
+      }
+    } catch {
+      // Continue with a single browser request if storage cannot be read.
+    }
+
+    if (typeof window !== "undefined" && window.isSecureContext === false) {
+      setStatus("insecure");
+      return;
+    }
+
+    if (navigator.permissions?.query) {
+      navigator.permissions
+        .query({ name: "geolocation" })
+        .then((permission) => {
+          if (permission.state === "denied") {
+            handlePositionError({
+              code: 1,
+              PERMISSION_DENIED: 1,
+              POSITION_UNAVAILABLE: 2,
+              TIMEOUT: 3,
+              message: "Location permission denied",
+            } as GeolocationPositionError);
+            return;
+          }
+          acquireDeviceLocation();
+        })
+        .catch(() => acquireDeviceLocation());
+      return;
+    }
+
+    acquireDeviceLocation();
+  }, [locationEnabled, acquireDeviceLocation, handlePositionError]);
+
+  // Returning users who previously allowed location get a fresh device fix.
+  // No cached coordinates are read or presented as the current position.
+  useEffect(() => {
+    if (!locationEnabled) return;
+    if (typeof window !== "undefined" && window.isSecureContext === false) {
+      setStatus("insecure");
+      return;
+    }
+    if (!navigator.geolocation) {
+      setStatus("unavailable");
+      setAccuracySource("offline");
+      return;
+    }
+
+    if (!locationRef.current) setStatus("requesting");
+    const watchId = navigator.geolocation.watchPosition(
+      acceptPosition,
+      handlePositionError,
+      { enableHighAccuracy: true, timeout: 20_000, maximumAge: 0 },
     );
 
-    // Start active high-accuracy watch tracking immediately
-    startHighAccuracyWatch();
+    return () => navigator.geolocation.clearWatch(watchId);
+  }, [locationEnabled, acceptPosition, handlePositionError]);
 
-    // Listen to user map interactions to wake up from stasis instantly
-    const handleUserWakeup = () => {
-      if (localIsStasis) {
-        console.log(
-          "[norby] User interaction detected. Waking up high-power GPS watch.",
-        );
-        startHighAccuracyWatch();
-      } else {
-        lastMoveTime = Date.now(); // reset timer on click/activity
-      }
-    };
-
-    // Expose wake-up for refreshLocation
-    wakeFromStasisRef.current = handleUserWakeup;
-
-    window.addEventListener("click", handleUserWakeup);
-    window.addEventListener("touchstart", handleUserWakeup);
-
-    return () => {
-      finished = true;
-
-      window.removeEventListener("click", handleUserWakeup);
-      window.removeEventListener("touchstart", handleUserWakeup);
-      if (watchId !== null) {
-        navigator.geolocation.clearWatch(watchId);
-      }
-      if (passivePollInterval !== null) {
-        clearInterval(passivePollInterval);
-      }
-      if (ipFallbackTimer !== null) {
-        clearTimeout(ipFallbackTimer);
-      }
-    };
-  }, [locationEnabled, maskLocation]);
-
-  const requestLocation = () => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem(LOCATION_ENABLED_KEY, "true");
-    }
-    setLocationEnabled(true);
-  };
-
-  const disableLocation = () => {
-    if (typeof window !== "undefined") {
-      localStorage.removeItem(LOCATION_ENABLED_KEY);
-      localStorage.removeItem("norby_last_location");
-    }
-    hasGPSRef.current = false;
+  const disableLocation = useCallback(() => {
     setLocationState(null);
+    locationRef.current = null;
     setAccuracy(null);
     setAccuracySource("waiting");
     setStatus("waiting");
+    setIsStasis(false);
     setLocationEnabled(false);
-  };
+    try {
+      localStorage.removeItem(LOCATION_ENABLED_KEY);
+      localStorage.removeItem(LOCATION_DENIED_KEY);
+    } catch {
+      // Storage can be unavailable in private browsing modes.
+    }
+  }, []);
 
-  const refreshLocation = () => {
-    if (!locationEnabled) {
-      return Promise.resolve(null);
+  const refreshLocation = useCallback(() => {
+    if (!navigator.geolocation) {
+      setStatus("unavailable");
+      return Promise.resolve(locationRef.current);
     }
 
-    // Wake from stasis if currently in low-power mode
-    if (wakeFromStasisRef.current) {
-      wakeFromStasisRef.current();
-    }
-
-    return new Promise<{ lat: number; lng: number } | null>(
-      (resolve, reject) => {
-        let finished = false;
-
-        getIPLocation()
-          .then((ipLoc) => {
-            if (
-              !finished &&
-              ipLoc &&
-              !locationRef.current &&
-              !hasGPSRef.current
-            ) {
-              const offset = maskLocation
-                ? getStableOffset(ipLoc.lat, ipLoc.lng)
-                : { latOffset: 0, lngOffset: 0 };
-              const newCoords = {
-                lat: ipLoc.lat + offset.latOffset,
-                lng: ipLoc.lng + offset.lngOffset,
-              };
-              setLocation(newCoords);
-              setStatus("granted");
-              setAccuracySource("ip-fallback");
-            }
-          })
-          .catch((err) => console.warn("IP location error on refresh:", err));
-
-        if (navigator.geolocation) {
-          navigator.geolocation.getCurrentPosition(
-            (pos) => {
-              finished = true;
-              if (pos.coords.accuracy > 5000 && locationRef.current) {
-                console.log("[norby] Discarding low-accuracy GPS on refresh");
-                resolve(locationRef.current);
-                return;
-              }
-              hasGPSRef.current = true;
-              const offset = maskLocation
-                ? getStableOffset(pos.coords.latitude, pos.coords.longitude)
-                : { latOffset: 0, lngOffset: 0 };
-              const newCoords = {
-                lat: pos.coords.latitude + offset.latOffset,
-                lng: pos.coords.longitude + offset.lngOffset,
-              };
-              setLocation(newCoords);
-              setAccuracy(pos.coords.accuracy);
-              setAccuracySource(
-                pos.coords.accuracy <= 200 ? "gps-high" : "gps-low",
-              );
-              setStatus("granted");
-              resolve(newCoords);
-            },
-            (err) => {
-              finished = true;
-              resolve(locationRef.current);
-            },
-            { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 },
-          );
-        } else {
-          finished = true;
+    if (!locationRef.current) setStatus("requesting");
+    return new Promise<Coordinates | null>((resolve) => {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          acceptPosition(position);
+          resolve({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+          });
+        },
+        (error) => {
+          handlePositionError(error);
           resolve(locationRef.current);
-        }
-      },
-    );
-  };
+        },
+        { enableHighAccuracy: true, timeout: 20_000, maximumAge: 0 },
+      );
+    });
+  }, [acceptPosition, handlePositionError]);
+
+  const sharedLocation = (() => {
+    if (!location || !maskLocation) return location;
+    const offset = getStableOffset(location.lat, location.lng);
+    return {
+      lat: Math.max(-90, Math.min(90, location.lat + offset.latOffset)),
+      lng: Math.max(-180, Math.min(180, location.lng + offset.lngOffset)),
+    };
+  })();
 
   return {
     location,
+    sharedLocation,
     status,
     locationEnabled,
     requestLocation,

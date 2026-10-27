@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest';
-import { getDistanceKm, getStableOffset } from '../../src/hooks/useGeolocation';
+import { act, renderHook } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
+import { getDistanceKm, getStableOffset, useGeolocation } from '../../src/hooks/useGeolocation';
 
 describe('getDistanceKm', () => {
   it('calculates Delhi to Mumbai correctly (~1150km)', () => {
@@ -32,5 +33,129 @@ describe('getStableOffset', () => {
     const offset = getStableOffset(lat, lng);
     expect(Math.abs(offset.latOffset)).toBeLessThan(0.002);
     expect(Math.abs(offset.lngOffset)).toBeLessThan(0.002);
+  });
+});
+
+describe('useGeolocation', () => {
+  const devicePosition = {
+    coords: {
+      latitude: 19.076,
+      longitude: 72.8777,
+      accuracy: 12,
+    },
+  } as GeolocationPosition;
+
+  function installGeolocation() {
+    let success: PositionCallback | undefined;
+    let failure: PositionErrorCallback | undefined;
+    const getCurrentPosition = vi.fn((
+      onSuccess: PositionCallback,
+      onError: PositionErrorCallback,
+    ) => {
+      success = onSuccess;
+      failure = onError;
+    });
+    const watchPosition = vi.fn(() => 73);
+    const clearWatch = vi.fn();
+    Object.defineProperty(navigator, 'geolocation', {
+      configurable: true,
+      value: { getCurrentPosition, watchPosition, clearWatch },
+    });
+    return {
+      getCurrentPosition,
+      watchPosition,
+      clearWatch,
+      getSuccess: () => success,
+      getFailure: () => failure,
+    };
+  }
+
+  it('requests a fresh high-accuracy device position and keeps exact local coordinates', () => {
+    localStorage.clear();
+    const geo = installGeolocation();
+    const { result } = renderHook(() => useGeolocation(true));
+
+    act(() => result.current.requestLocation());
+    expect(geo.getCurrentPosition).toHaveBeenCalledWith(
+      expect.any(Function),
+      expect.any(Function),
+      { enableHighAccuracy: true, timeout: 20_000, maximumAge: 0 },
+    );
+
+    act(() => geo.getSuccess()?.(devicePosition));
+
+    expect(result.current.location).toEqual({ lat: 19.076, lng: 72.8777 });
+    expect(result.current.sharedLocation).not.toEqual(result.current.location);
+    expect(result.current.status).toBe('granted');
+    expect(geo.watchPosition).toHaveBeenCalled();
+  });
+
+  it('does not use stored coordinates as current device location', () => {
+    localStorage.setItem('norby_location_enabled', 'true');
+    localStorage.setItem('norby_last_location', JSON.stringify({ lat: 1, lng: 2 }));
+    installGeolocation();
+
+    const { result } = renderHook(() => useGeolocation());
+
+    expect(result.current.location).toBeNull();
+    expect(result.current.status).toBe('requesting');
+  });
+
+  it('maps browser permission denial to a retryable denied status', () => {
+    localStorage.clear();
+    const geo = installGeolocation();
+    const { result } = renderHook(() => useGeolocation());
+    const error = {
+      code: 1,
+      PERMISSION_DENIED: 1,
+      POSITION_UNAVAILABLE: 2,
+      TIMEOUT: 3,
+    } as GeolocationPositionError;
+
+    act(() => result.current.requestLocation());
+    act(() => geo.getFailure()?.(error));
+
+    expect(result.current.status).toBe('denied');
+    expect(result.current.location).toBeNull();
+  });
+
+  it('attempts native location once on entry and does not repeat after denial', () => {
+    localStorage.clear();
+    const firstGeo = installGeolocation();
+    const firstMount = renderHook(() => useGeolocation());
+    expect(firstGeo.getCurrentPosition).toHaveBeenCalledTimes(1);
+
+    act(() => firstGeo.getFailure()?.({
+      code: 1,
+      PERMISSION_DENIED: 1,
+      POSITION_UNAVAILABLE: 2,
+      TIMEOUT: 3,
+      message: "denied",
+    } as GeolocationPositionError));
+    firstMount.unmount();
+
+    const secondGeo = installGeolocation();
+    const secondMount = renderHook(() => useGeolocation());
+    expect(secondGeo.getCurrentPosition).not.toHaveBeenCalled();
+    expect(secondMount.result.current.status).toBe('denied');
+    secondMount.unmount();
+  });
+
+  it('gets a fresh device fix automatically when browser permission is already granted', async () => {
+    localStorage.clear();
+    const geo = installGeolocation();
+    Object.defineProperty(navigator, 'permissions', {
+      configurable: true,
+      value: { query: vi.fn().mockResolvedValue({ state: 'granted' }) },
+    });
+    const { result } = renderHook(() => useGeolocation());
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+    act(() => geo.getSuccess()?.(devicePosition));
+
+    expect(geo.getCurrentPosition).toHaveBeenCalledTimes(1);
+    expect(result.current.location).toEqual({ lat: 19.076, lng: 72.8777 });
   });
 });

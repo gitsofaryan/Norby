@@ -8,6 +8,9 @@ const withPWA = withPWAInit({
 });
 
 const nextConfig: NextConfig = {
+  // This app's routes are TypeScript. Ignore generated JavaScript under
+  // src/app/**/dist so it cannot be interpreted as additional routes.
+  pageExtensions: ["ts", "tsx"],
   serverExternalPackages: ["ws"],
   turbopack: {},
   async headers() {
@@ -26,6 +29,14 @@ const nextConfig: NextConfig = {
           {
             key: "Referrer-Policy",
             value: "strict-origin-when-cross-origin",
+          },
+          {
+            key: "Permissions-Policy",
+            value: "geolocation=(self)",
+          },
+          {
+            key: "Strict-Transport-Security",
+            value: "max-age=31536000",
           },
         ],
       },

@@ -9,6 +9,8 @@ import { Compass, Send, Bell, Mic, MicOff, Radio } from "lucide-react";
 function FloatingControlsInner() {
   const { isSignedIn } = useAuth();
   const {
+    location,
+    requestLocation,
     filteredUsers,
     socketReady,
     showNotifDropdown,
@@ -29,7 +31,11 @@ function FloatingControlsInner() {
     if (typeof navigator !== "undefined" && navigator.vibrate) {
       navigator.vibrate(12);
     }
-    refreshRadar();
+    if (location) {
+      refreshRadar();
+    } else {
+      requestLocation();
+    }
   };
 
   return (
@@ -168,7 +174,8 @@ function FloatingControlsInner() {
           id="btn-recenter"
           onClick={handleRecenterClick}
           className="w-12 h-12 rounded-full bg-white/95 backdrop-blur-md border border-zinc-200 shadow-[0_4px_15px_rgba(0,0,0,0.1)] flex items-center justify-center text-zinc-500 hover:text-zinc-900 transition-colors active:scale-90 cursor-pointer"
-          title="Refresh Radar"
+          title={location ? "Refresh Radar" : "Use my location"}
+          aria-label={location ? "Refresh radar and location" : "Use my location"}
         >
           <Compass size={22} strokeWidth={2.5} />
         </button>
