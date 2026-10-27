@@ -38,6 +38,7 @@ describe('getStableOffset', () => {
 
 describe('useGeolocation', () => {
   const devicePosition = {
+    timestamp: 2_000,
     coords: {
       latitude: 19.076,
       longitude: 72.8777,
@@ -46,16 +47,20 @@ describe('useGeolocation', () => {
   } as GeolocationPosition;
 
   function installGeolocation() {
-    let success: PositionCallback | undefined;
-    let failure: PositionErrorCallback | undefined;
+    const successes: PositionCallback[] = [];
+    const failures: PositionErrorCallback[] = [];
+    let watchSuccess: PositionCallback | undefined;
     const getCurrentPosition = vi.fn((
       onSuccess: PositionCallback,
       onError: PositionErrorCallback,
     ) => {
-      success = onSuccess;
-      failure = onError;
+      successes.push(onSuccess);
+      failures.push(onError);
     });
-    const watchPosition = vi.fn(() => 73);
+    const watchPosition = vi.fn((onSuccess: PositionCallback) => {
+      watchSuccess = onSuccess;
+      return 73;
+    });
     const clearWatch = vi.fn();
     Object.defineProperty(navigator, 'geolocation', {
       configurable: true,
@@ -65,8 +70,9 @@ describe('useGeolocation', () => {
       getCurrentPosition,
       watchPosition,
       clearWatch,
-      getSuccess: () => success,
-      getFailure: () => failure,
+      getSuccess: (index = successes.length - 1) => successes[index],
+      getFailure: (index = failures.length - 1) => failures[index],
+      getWatchSuccess: () => watchSuccess,
     };
   }
 
@@ -157,5 +163,65 @@ describe('useGeolocation', () => {
 
     expect(geo.getCurrentPosition).toHaveBeenCalledTimes(1);
     expect(result.current.location).toEqual({ lat: 19.076, lng: 72.8777 });
+  });
+
+  it('ignores an older GPS response that arrives after a newer fix', async () => {
+    localStorage.clear();
+    const geo = installGeolocation();
+    Object.defineProperty(navigator, 'permissions', {
+      configurable: true,
+      value: { query: vi.fn().mockResolvedValue({ state: 'denied' }) },
+    });
+    const { result } = renderHook(() => useGeolocation());
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+    act(() => result.current.requestLocation());
+    act(() => geo.getSuccess(0)?.(devicePosition));
+    act(() => geo.getWatchSuccess()?.({
+        timestamp: 3_000,
+        coords: {
+          latitude: 20,
+          longitude: 73,
+          accuracy: 5,
+        },
+      } as GeolocationPosition));
+
+    let refreshResult: Promise<{ lat: number; lng: number } | null>;
+    act(() => {
+      refreshResult = result.current.refreshLocation();
+    });
+    act(() =>
+      geo.getSuccess(1)?.({
+        timestamp: 2_000,
+        coords: {
+          latitude: 1,
+          longitude: 2,
+          accuracy: 5,
+        },
+      } as GeolocationPosition),
+    );
+
+    expect(result.current.location).toEqual({ lat: 20, lng: 73 });
+    await expect(refreshResult!).resolves.toEqual({ lat: 20, lng: 73 });
+  });
+
+  it('reports GPS timeouts and leaves location unset so the user can retry', () => {
+    localStorage.clear();
+    const geo = installGeolocation();
+    const { result } = renderHook(() => useGeolocation());
+
+    act(() => result.current.requestLocation());
+    act(() => geo.getFailure()?.({
+      code: 3,
+      PERMISSION_DENIED: 1,
+      POSITION_UNAVAILABLE: 2,
+      TIMEOUT: 3,
+      message: "Timed out",
+    } as GeolocationPositionError));
+
+    expect(result.current.status).toBe('timeout');
+    expect(result.current.location).toBeNull();
   });
 });

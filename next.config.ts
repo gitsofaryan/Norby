@@ -5,6 +5,17 @@ const withPWA = withPWAInit({
   dest: "public",
   disable: process.env.NODE_ENV === "development",
   register: true,
+  extendDefaultRuntimeCaching: true,
+  workboxOptions: {
+    runtimeCaching: [
+      {
+        urlPattern: ({ url }) =>
+          url.hostname === "tile.openstreetmap.org" ||
+          url.hostname.endsWith(".tile.openstreetmap.org"),
+        handler: "NetworkOnly",
+      },
+    ],
+  },
 });
 
 const nextConfig: NextConfig = {

@@ -42,6 +42,8 @@ function MapController({
   setBounds: (bounds: any) => void;
 }) {
   const map = useMap();
+  const hasCenteredOnLocationRef = useRef(false);
+  const previousTriggerRef = useRef(trigger);
 
   useEffect(() => {
     (window as any).leafletMap = map;
@@ -52,6 +54,7 @@ function MapController({
 
   useEffect(() => {
     setZoom(map.getZoom());
+    setBounds(map.getBounds());
     const onZoom = () => {
       setZoom(map.getZoom());
     };
@@ -59,7 +62,7 @@ function MapController({
     return () => {
       map.off("zoomend", onZoom);
     };
-  }, [map, setZoom]);
+  }, [map, setZoom, setBounds]);
 
   useEffect(() => {
     const onMoveStart = () => setIsInteracting(true);
@@ -87,20 +90,23 @@ function MapController({
       map.off("dragstart", onDragStart);
       map.off("dragend", onDragEnd);
     };
-  }, [map, setFollowUser, setIsInteracting]);
+  }, [map, setBounds, setFollowUser, setIsInteracting]);
 
   useEffect(() => {
-    if (followUser && lat !== null && lng !== null) {
-      map.panTo([lat, lng], { animate: true, duration: 0.5 });
-      setTimeout(() => setBounds(map.getBounds()), 600);
-    }
-  }, [lat, lng, followUser, map, setBounds]);
+    const recenterRequested = trigger !== previousTriggerRef.current;
+    previousTriggerRef.current = trigger;
 
-  useEffect(() => {
     if (lat === null || lng === null) return;
-    map.flyTo([lat, lng], map.getZoom(), { animate: true, duration: 0.8 });
-    setTimeout(() => setBounds(map.getBounds()), 900);
-  }, [trigger, map, lat, lng, setBounds]);
+
+    if (!hasCenteredOnLocationRef.current) {
+      hasCenteredOnLocationRef.current = true;
+      map.flyTo([lat, lng], 15, { animate: true, duration: 0.8 });
+    } else if (recenterRequested) {
+      map.flyTo([lat, lng], map.getZoom(), { animate: true, duration: 0.8 });
+    } else if (followUser && map.distance(map.getCenter(), [lat, lng]) > 15) {
+      map.panTo([lat, lng], { animate: true, duration: 0.5 });
+    }
+  }, [trigger, map, lat, lng, followUser]);
 
   return null;
 }
@@ -239,6 +245,55 @@ function LiveMapContent() {
   }, []);
   const osmPlaces = useOSM(bounds, zoom);
 
+  const [tileStatus, setTileStatus] = useState<"loading" | "loaded" | "error">("loading");
+  const [tileLayerVersion, setTileLayerVersion] = useState(0);
+  const tileErrorRef = useRef(false);
+  const tileLoadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const startTileLoadTimeout = useCallback(() => {
+    if (tileLoadTimeoutRef.current) clearTimeout(tileLoadTimeoutRef.current);
+    tileLoadTimeoutRef.current = setTimeout(() => {
+      setTileStatus((status) => (status === "loading" ? "error" : status));
+    }, 15_000);
+  }, []);
+
+  const handleTilesLoading = useCallback(() => {
+    tileErrorRef.current = false;
+    setTileStatus("loading");
+    startTileLoadTimeout();
+  }, [startTileLoadTimeout]);
+
+  const handleTilesLoaded = useCallback(() => {
+    if (tileLoadTimeoutRef.current) clearTimeout(tileLoadTimeoutRef.current);
+    tileLoadTimeoutRef.current = null;
+    setTileStatus(tileErrorRef.current ? "error" : "loaded");
+  }, []);
+
+  const handleTileError = useCallback(() => {
+    tileErrorRef.current = true;
+    setTileStatus("error");
+  }, []);
+
+  const tileEventHandlers = useMemo(
+    () => ({
+      loading: handleTilesLoading,
+      load: handleTilesLoaded,
+      tileerror: handleTileError,
+    }),
+    [handleTilesLoading, handleTilesLoaded, handleTileError],
+  );
+
+  useEffect(() => () => {
+    if (tileLoadTimeoutRef.current) clearTimeout(tileLoadTimeoutRef.current);
+  }, []);
+
+  const retryTiles = () => {
+    tileErrorRef.current = false;
+    setTileStatus("loading");
+    startTileLoadTimeout();
+    setTileLayerVersion((version) => version + 1);
+  };
+
   // Calculate dispersion of markers to prevent overlapping
   const dispersedMarkers = useMemo(() => {
     if (!location) return [];
@@ -331,6 +386,9 @@ function LiveMapContent() {
       const radius = baseRadius * Math.max(0.5, Math.min(2.0, zoomScale));
 
       group.forEach((item, index) => {
+        // Keep the signed-in user's own marker anchored to the actual GPS fix.
+        if (item.type === "me") return;
+
         const angle = (2 * Math.PI * index) / N;
         const offsetLat = radius * Math.sin(angle);
         const cosLat = Math.cos((item.originalLat * Math.PI) / 180);
@@ -375,13 +433,15 @@ function LiveMapContent() {
       <MapContainer
         // Neutral initial view only; it is never treated as the user's location.
         center={[location?.lat ?? 0, location?.lng ?? 0]}
-        zoom={15}
+        zoom={location ? 15 : 2}
         style={{ height: "100%", width: "100%" }}
         zoomControl={false}
       >
         <TileLayer
+          key={tileLayerVersion}
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+          eventHandlers={tileEventHandlers}
         />
         <MapController
           lat={location?.lat ?? null}
@@ -431,6 +491,32 @@ function LiveMapContent() {
           </>
         )}
       </MapContainer>
+
+      {tileStatus === "loading" && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="pointer-events-none absolute left-1/2 top-1/2 z-[450] flex -translate-x-1/2 -translate-y-1/2 items-center gap-2 rounded-full border border-zinc-200 bg-white/95 px-3 py-2 text-xs font-medium text-zinc-700 shadow-md backdrop-blur-sm"
+        >
+          <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-800" />
+          Loading map…
+        </div>
+      )}
+      {tileStatus === "error" && (
+        <div
+          role="alert"
+          className="absolute left-1/2 top-1/2 z-[450] flex -translate-x-1/2 -translate-y-1/2 items-center gap-3 rounded-2xl border border-zinc-200 bg-white/95 px-4 py-3 text-xs text-zinc-700 shadow-md backdrop-blur-sm"
+        >
+          <span>Map tiles couldn’t load.</span>
+          <button
+            type="button"
+            onClick={retryTiles}
+            className="font-semibold text-zinc-900 underline underline-offset-2"
+          >
+            Retry
+          </button>
+        </div>
+      )}
 
       {/* Overlays */}
       <AnimatePresence>

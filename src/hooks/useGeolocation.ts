@@ -74,6 +74,8 @@ export function useGeolocation(maskLocation = true) {
   >("waiting");
   const locationRef = useRef<Coordinates | null>(null);
   const autoRequestStartedRef = useRef(false);
+  const locationRequestPendingRef = useRef(false);
+  const latestPositionTimestampRef = useRef<number | null>(null);
 
   const acceptPosition = useCallback((position: GeolocationPosition) => {
     const lat = position.coords.latitude;
@@ -87,7 +89,19 @@ export function useGeolocation(maskLocation = true) {
       lng > 180
     ) {
       setStatus("unavailable");
-      return;
+      return false;
+    }
+
+    const positionTimestamp = position.timestamp;
+    if (
+      Number.isFinite(positionTimestamp) &&
+      latestPositionTimestampRef.current !== null &&
+      positionTimestamp < latestPositionTimestampRef.current
+    ) {
+      return false;
+    }
+    if (Number.isFinite(positionTimestamp)) {
+      latestPositionTimestampRef.current = positionTimestamp;
     }
 
     const actualCoordinates = { lat, lng };
@@ -96,6 +110,7 @@ export function useGeolocation(maskLocation = true) {
     setAccuracy(position.coords.accuracy);
     setAccuracySource(position.coords.accuracy <= 200 ? "gps-high" : "gps-low");
     setStatus("granted");
+    return true;
   }, []);
 
   const handlePositionError = useCallback((error: GeolocationPositionError) => {
@@ -136,10 +151,13 @@ export function useGeolocation(maskLocation = true) {
       setAccuracySource("offline");
       return;
     }
+    if (locationRequestPendingRef.current) return;
 
+    locationRequestPendingRef.current = true;
     if (!locationRef.current) setStatus("requesting");
     navigator.geolocation.getCurrentPosition(
       (position) => {
+        locationRequestPendingRef.current = false;
         acceptPosition(position);
         setLocationEnabled(true);
         try {
@@ -148,7 +166,10 @@ export function useGeolocation(maskLocation = true) {
           // The current session still works when storage is unavailable.
         }
       },
-      handlePositionError,
+      (error) => {
+        locationRequestPendingRef.current = false;
+        handlePositionError(error);
+      },
       { enableHighAccuracy: true, timeout: 20_000, maximumAge: 0 },
     );
   }, [acceptPosition, handlePositionError]);
@@ -229,6 +250,7 @@ export function useGeolocation(maskLocation = true) {
   const disableLocation = useCallback(() => {
     setLocationState(null);
     locationRef.current = null;
+    latestPositionTimestampRef.current = null;
     setAccuracy(null);
     setAccuracySource("waiting");
     setStatus("waiting");
@@ -247,18 +269,24 @@ export function useGeolocation(maskLocation = true) {
       setStatus("unavailable");
       return Promise.resolve(locationRef.current);
     }
+    if (locationRequestPendingRef.current) {
+      return Promise.resolve(locationRef.current);
+    }
 
+    locationRequestPendingRef.current = true;
     if (!locationRef.current) setStatus("requesting");
     return new Promise<Coordinates | null>((resolve) => {
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          acceptPosition(position);
-          resolve({
+          locationRequestPendingRef.current = false;
+          const coordinates = {
             lat: position.coords.latitude,
             lng: position.coords.longitude,
-          });
+          };
+          resolve(acceptPosition(position) ? coordinates : locationRef.current);
         },
         (error) => {
+          locationRequestPendingRef.current = false;
           handlePositionError(error);
           resolve(locationRef.current);
         },

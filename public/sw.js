@@ -59,6 +59,14 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
+  // Let the browser honor OpenStreetMap's HTTP tile cache headers directly.
+  if (
+    url.hostname === "tile.openstreetmap.org" ||
+    url.hostname.endsWith(".tile.openstreetmap.org")
+  ) {
+    return;
+  }
+
   // Caching Strategy: Stale-While-Revalidate for static resources (JS, CSS, images, fonts, icons)
   if (
     url.pathname.endsWith(".js") ||
@@ -68,7 +76,6 @@ self.addEventListener("fetch", (event) => {
     url.pathname.endsWith(".svg") ||
     url.pathname.endsWith(".json") ||
     url.hostname.includes("cartocdn") || // Leaflet Map Tiles
-    url.hostname.includes("tile.openstreetmap") ||
     url.hostname.includes("api.dicebear.com") // DiceBear Avatars
   ) {
     event.respondWith(
