@@ -37,7 +37,9 @@ describe('playSound', () => {
       createOscillator: vi.fn(() => mockOscillator),
       createGain: vi.fn(() => mockGain),
       destination: {},
-      resume: vi.fn().mockResolvedValue(undefined),
+      resume: vi.fn().mockImplementation(async () => {
+        mockAudioContext.state = 'running';
+      }),
     };
 
     // Define AudioContext mock on global window
@@ -52,8 +54,9 @@ describe('playSound', () => {
     expect(mockAudioContext.createOscillator).not.toHaveBeenCalled();
   });
 
-  it('plays sound, creates oscillator and gain, and sets frequencies when not muted', () => {
+  it('plays sound, creates oscillator and gain, and sets frequencies when not muted', async () => {
     playSound('pop');
+    await Promise.resolve();
     expect(mockAudioContext.createOscillator).toHaveBeenCalled();
     expect(mockAudioContext.createGain).toHaveBeenCalled();
     expect(mockOscillator.connect).toHaveBeenCalledWith(mockGain);

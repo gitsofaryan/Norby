@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 
 export interface OSMPlace {
   id: number;
@@ -26,6 +26,36 @@ export function useOSM(
   const abortControllerRef = useRef<AbortController | null>(null);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastFetchedKeyRef = useRef<string | null>(null);
+
+  // Bounds objects are recreated by Leaflet frequently, including while the
+  // viewport is still. Only the rounded query bounds should drive a request.
+  // Depending on the object itself caused effect cleanup to abort valid fetches.
+  const query = useMemo(() => {
+    if (!mapBounds || zoom < 14) return null;
+
+    const { _southWest: sw, _northEast: ne } = mapBounds;
+    const roundTo = 0.01;
+    const s = Math.floor(sw.lat / roundTo) * roundTo;
+    const w = Math.floor(sw.lng / roundTo) * roundTo;
+    const n = Math.ceil(ne.lat / roundTo) * roundTo;
+    const e = Math.ceil(ne.lng / roundTo) * roundTo;
+    const cacheKey = `${s},${w},${n},${e}`;
+
+    return {
+      s,
+      w,
+      n,
+      e,
+      cacheKey,
+      storageKey: `norby_osm_cache_${cacheKey}`,
+    };
+  }, [
+    mapBounds?._southWest.lat,
+    mapBounds?._southWest.lng,
+    mapBounds?._northEast.lat,
+    mapBounds?._northEast.lng,
+    zoom,
+  ]);
 
   // Clean up expired cache items from localStorage on mount
   useEffect(() => {
@@ -68,22 +98,12 @@ export function useOSM(
   }, []);
 
   useEffect(() => {
-    // Only fetch if zoom is high enough to avoid massive queries
-    if (!mapBounds || zoom < 14) {
+    if (!query) {
       if (zoom < 14) setPlaces([]);
       return;
     }
 
-    const { _southWest: sw, _northEast: ne } = mapBounds;
-    // Round bounds to roughly 0.01 degrees to increase cache hit rate and reduce small fetch jitter
-    const roundTo = 0.01;
-    const cacheS = Math.floor(sw.lat / roundTo) * roundTo;
-    const cacheW = Math.floor(sw.lng / roundTo) * roundTo;
-    const cacheN = Math.ceil(ne.lat / roundTo) * roundTo;
-    const cacheE = Math.ceil(ne.lng / roundTo) * roundTo;
-
-    const cacheKey = `${cacheS},${cacheW},${cacheN},${cacheE}`;
-    const storageKey = `norby_osm_cache_${cacheKey}`;
+    const { s, w, n, e, cacheKey, storageKey } = query;
 
     // 1. In-memory fast cache check
     if (cache.current.has(cacheKey)) {
@@ -125,7 +145,7 @@ export function useOSM(
     debounceTimerRef.current = setTimeout(() => {
     abortControllerRef.current = new AbortController();
 
-    const url = `/api/osm?s=${cacheS}&w=${cacheW}&n=${cacheN}&e=${cacheE}`;
+    const url = `/api/osm?s=${s}&w=${w}&n=${n}&e=${e}`;
 
     fetch(url, { signal: abortControllerRef.current.signal })
       .then((res) => {
@@ -182,7 +202,7 @@ export function useOSM(
         clearTimeout(debounceTimerRef.current);
       }
     };
-  }, [mapBounds, zoom]);
+  }, [query, zoom]);
 
   return places;
 }

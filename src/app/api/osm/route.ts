@@ -1,14 +1,38 @@
 export const runtime = "nodejs";
 
-const cache = new Map<string, { timestamp: number; payload: any }>();
-const inflight = new Map<string, Promise<any>>();
+type OsmElement = Record<string, unknown> & {
+  tags?: { name?: unknown };
+};
+
+type OsmPayload = { elements: OsmElement[] };
+
+const cache = new Map<string, { timestamp: number; payload: OsmPayload }>();
+const inflight = new Map<string, Promise<OsmPayload>>();
 
 const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+const FETCH_TIMEOUT_MS = 8_000;
 
 function parseNumber(value: string | null) {
   if (value === null) return null;
   const num = Number(value);
   return Number.isFinite(num) ? num : null;
+}
+
+function isValidBbox(s: number, w: number, n: number, e: number) {
+  return (
+    s >= -90 &&
+    n <= 90 &&
+    w >= -180 &&
+    e <= 180 &&
+    s < n &&
+    w < e
+  );
+}
+
+function hasPlaceName(element: unknown): element is OsmElement {
+  if (!element || typeof element !== "object") return false;
+  const tags = (element as OsmElement).tags;
+  return typeof tags?.name === "string" && tags.name.length > 0;
 }
 
 export async function GET(request: Request) {
@@ -36,6 +60,14 @@ export async function GET(request: Request) {
     return Response.json(
       { error: "Invalid bbox. Provide bbox=s,w,n,e or s,w,n,e params." },
       { status: 400 }
+    );
+  }
+
+  // Keep invalid geographic coordinates out of the generated Overpass query.
+  if (!isValidBbox(s, w, n, e)) {
+    return Response.json(
+      { error: "Invalid bbox coordinates. Use south,west,north,east within geographic bounds." },
+      { status: 400 },
     );
   }
 
@@ -86,14 +118,18 @@ export async function GET(request: Request) {
     headers: {
       "User-Agent": "norby-app/1.0",
     },
+    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
   })
     .then(async (res) => {
       if (!res.ok) {
         throw new Error(`Overpass error: ${res.status}`);
       }
-      const data = await res.json();
-      const elements = Array.isArray(data?.elements) ? data.elements : [];
-      const namedPlaces = elements.filter((el: any) => el?.tags?.name);
+      const data: unknown = await res.json();
+      const elements =
+        data && typeof data === "object" && Array.isArray((data as { elements?: unknown }).elements)
+          ? (data as { elements: unknown[] }).elements
+          : [];
+      const namedPlaces = elements.filter(hasPlaceName);
       return { elements: namedPlaces };
     })
     .then((payload) => {
@@ -120,7 +156,7 @@ export async function GET(request: Request) {
         "Cache-Control": "public, s-maxage=600, stale-while-revalidate=600",
       },
     });
-  } catch (err) {
+  } catch {
     return Response.json(
       { elements: [] },
       { 

@@ -2,23 +2,16 @@ import { describe, expect, it } from "vitest";
 import { MAP_FILTERS, matchesMapFilterText } from "../../src/lib/mapFilters";
 
 describe("map filters", () => {
-  it("keeps existing filters and adds Devcon categories", () => {
+  it("exposes the enabled Devcon filters", () => {
     expect(MAP_FILTERS.map((filter) => filter.key)).toEqual([
       "all",
-      "cafe",
       "coffee-chats",
-      "dating",
       "side-events",
       "views",
       "landmarks",
       "local-eats",
       "hidden-gems",
       "community",
-      "ethereum",
-      "ai",
-      "defi",
-      "zk",
-      "hackathons",
       "building-together",
       "technical-discussions",
       "founders",

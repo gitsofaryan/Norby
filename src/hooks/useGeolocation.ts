@@ -197,31 +197,34 @@ export function useGeolocation(maskLocation: boolean = true) {
     let finished = false;
     let watchId: number | null = null;
     let passivePollInterval: ReturnType<typeof setInterval> | null = null;
+    let ipFallbackTimer: ReturnType<typeof setTimeout> | null = null;
 
     let localIsStasis = false;
     let lastMoveTime = Date.now();
     let lastLatitude: number | null = null;
     let lastLongitude: number | null = null;
 
-    // Fast IP Geolocation fallback so map is never collapsed
-    getIPLocation()
-      .then((ipLoc) => {
-        if (!finished && ipLoc && !hasGPSRef.current) {
-          const offset = maskLocation
-            ? getStableOffset(ipLoc.lat, ipLoc.lng)
-            : { latOffset: 0, lngOffset: 0 };
-          const newLat = ipLoc.lat + offset.latOffset;
-          const newLng = ipLoc.lng + offset.lngOffset;
-          if (!locationRef.current) {
-            setLocation({ lat: newLat, lng: newLng });
+    // Give the device's cached GPS result a brief head start. IP geolocation is
+    // often city-level and should be a fallback, not the first map position.
+    ipFallbackTimer = setTimeout(() => {
+      getIPLocation()
+        .then((ipLoc) => {
+          if (!finished && ipLoc && !hasGPSRef.current && !locationRef.current) {
+            const offset = maskLocation
+              ? getStableOffset(ipLoc.lat, ipLoc.lng)
+              : { latOffset: 0, lngOffset: 0 };
+            setLocation({
+              lat: ipLoc.lat + offset.latOffset,
+              lng: ipLoc.lng + offset.lngOffset,
+            });
             setStatus("granted");
             setAccuracySource("ip-fallback");
           }
-        }
-      })
-      .catch((err) => {
-        console.warn("IP Geolocation mount error:", err);
-      });
+        })
+        .catch((err) => {
+          console.warn("IP Geolocation mount error:", err);
+        });
+    }, 1_500);
 
     const startHighAccuracyWatch = () => {
       if (watchId !== null) return;
@@ -359,6 +362,7 @@ export function useGeolocation(maskLocation: boolean = true) {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         if (!finished && !hasGPSRef.current) {
+          hasGPSRef.current = true;
           const offset = maskLocation
             ? getStableOffset(pos.coords.latitude, pos.coords.longitude)
             : { latOffset: 0, lngOffset: 0 };
@@ -373,7 +377,7 @@ export function useGeolocation(maskLocation: boolean = true) {
         }
       },
       () => {}, // Ignore errors, watchPosition will handle it
-      { enableHighAccuracy: false, timeout: 5000, maximumAge: Infinity },
+      { enableHighAccuracy: false, timeout: 2500, maximumAge: 60_000 },
     );
 
     // Start active high-accuracy watch tracking immediately
@@ -407,6 +411,9 @@ export function useGeolocation(maskLocation: boolean = true) {
       }
       if (passivePollInterval !== null) {
         clearInterval(passivePollInterval);
+      }
+      if (ipFallbackTimer !== null) {
+        clearTimeout(ipFallbackTimer);
       }
     };
   }, [locationEnabled, maskLocation]);
