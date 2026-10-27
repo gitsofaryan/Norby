@@ -73,6 +73,7 @@ export function useGeolocation(maskLocation = true) {
     "gps-high" | "gps-low" | "offline" | "waiting"
   >("waiting");
   const locationRef = useRef<Coordinates | null>(null);
+  const accuracyRef = useRef<number | null>(null);
   const autoRequestStartedRef = useRef(false);
   const locationRequestPendingRef = useRef(false);
   const latestPositionTimestampRef = useRef<number | null>(null);
@@ -80,13 +81,16 @@ export function useGeolocation(maskLocation = true) {
   const acceptPosition = useCallback((position: GeolocationPosition) => {
     const lat = position.coords.latitude;
     const lng = position.coords.longitude;
+    const acc = position.coords.accuracy;
+
     if (
       !Number.isFinite(lat) ||
       !Number.isFinite(lng) ||
       lat < -90 ||
       lat > 90 ||
       lng < -180 ||
-      lng > 180
+      lng > 180 ||
+      (lat === 0 && lng === 0)
     ) {
       setStatus("unavailable");
       return false;
@@ -104,11 +108,22 @@ export function useGeolocation(maskLocation = true) {
       latestPositionTimestampRef.current = positionTimestamp;
     }
 
+    // Ignore wildly degraded fixes if we already hold an accurate GPS fix
+    if (
+      accuracyRef.current !== null &&
+      accuracyRef.current < 100 &&
+      acc > 1500 &&
+      locationRef.current !== null
+    ) {
+      return false;
+    }
+
     const actualCoordinates = { lat, lng };
     locationRef.current = actualCoordinates;
+    accuracyRef.current = acc;
     setLocationState(actualCoordinates);
-    setAccuracy(position.coords.accuracy);
-    setAccuracySource(position.coords.accuracy <= 200 ? "gps-high" : "gps-low");
+    setAccuracy(acc);
+    setAccuracySource(acc <= 200 ? "gps-high" : "gps-low");
     setStatus("granted");
     return true;
   }, []);
@@ -161,6 +176,7 @@ export function useGeolocation(maskLocation = true) {
         acceptPosition(position);
         setLocationEnabled(true);
         try {
+          localStorage.removeItem(LOCATION_DENIED_KEY);
           localStorage.setItem(LOCATION_ENABLED_KEY, "true");
         } catch {
           // The current session still works when storage is unavailable.
@@ -178,9 +194,7 @@ export function useGeolocation(maskLocation = true) {
     acquireDeviceLocation(true);
   }, [acquireDeviceLocation]);
 
-  // Restore location automatically only when the browser already grants it.
-  // When a prompt is needed, the existing map control calls requestLocation
-  // directly from the user's tap so mobile browsers can show their native UI.
+  // Request native location permission when undecided on load, or restore if already granted.
   useEffect(() => {
     if (locationEnabled || autoRequestStartedRef.current) return;
     autoRequestStartedRef.current = true;
@@ -213,22 +227,34 @@ export function useGeolocation(maskLocation = true) {
             return;
           }
           if (permission.state === "granted") {
-            acquireDeviceLocation();
+            acquireDeviceLocation(true);
             return;
           }
-          if (wasPreviouslyDenied) setStatus("denied");
+          // Permission is undecided ("prompt"): request native permission on first visit
+          if (wasPreviouslyDenied) {
+            setStatus("denied");
+            return;
+          }
+          acquireDeviceLocation();
         })
-        .catch(() => {
-          if (wasPreviouslyDenied) setStatus("denied");
+        .catch((err) => {
+          if (wasPreviouslyDenied) {
+            setStatus("denied");
+            return;
+          }
+          acquireDeviceLocation();
         });
       return;
     }
 
-    if (wasPreviouslyDenied) setStatus("denied");
+    if (wasPreviouslyDenied) {
+      setStatus("denied");
+      return;
+    }
+    acquireDeviceLocation();
   }, [locationEnabled, acquireDeviceLocation, handlePositionError]);
 
-  // Returning users who previously allowed location get a fresh device fix.
-  // No cached coordinates are read or presented as the current position.
+  // Returning users who previously allowed location get continuous GPS tracking.
   useEffect(() => {
     if (!locationEnabled) return;
     if (typeof window !== "undefined" && window.isSecureContext === false) {
@@ -254,6 +280,7 @@ export function useGeolocation(maskLocation = true) {
   const disableLocation = useCallback(() => {
     setLocationState(null);
     locationRef.current = null;
+    accuracyRef.current = null;
     latestPositionTimestampRef.current = null;
     setAccuracy(null);
     setAccuracySource("waiting");

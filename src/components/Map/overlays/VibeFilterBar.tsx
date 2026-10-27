@@ -1,6 +1,6 @@
 "use client";
 
-import { useMapContext } from "../MapProvider";
+import { useMapContext } from "@/components/Map/MapProvider";
 import { MAP_FILTERS } from "@/lib/mapFilters";
 
 export function VibeFilterBar() {

@@ -29,7 +29,6 @@ export function useOSM(
 
   // Bounds objects are recreated by Leaflet frequently, including while the
   // viewport is still. Only the rounded query bounds should drive a request.
-  // Depending on the object itself caused effect cleanup to abort valid fetches.
   const query = useMemo(() => {
     if (!mapBounds || zoom < 14) return null;
 
@@ -134,75 +133,68 @@ export function useOSM(
     if (lastFetchedKeyRef.current === cacheKey) return;
     lastFetchedKeyRef.current = cacheKey;
 
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
     }
 
     // Debounce: wait 500ms after last bounds change before fetching
     debounceTimerRef.current = setTimeout(() => {
-    abortControllerRef.current = new AbortController();
-
-    const url = `/api/osm?s=${s}&w=${w}&n=${n}&e=${e}`;
-
-    fetch(url, { signal: abortControllerRef.current.signal })
-      .then((res) => {
-        if (!res.ok) throw new Error("Overpass API rate limit or error");
-        return res.json();
-      })
-      .then((data) => {
-        if (data && data.elements) {
-          // Filter to places that actually have a name, as nameless generic buildings aren't useful for hotspots
-          const namedPlaces = data.elements.filter(
-            (el: OSMPlace) => el.tags && el.tags.name,
-          ) as OSMPlace[];
-
-          // Cache in memory
-          cache.current.set(cacheKey, namedPlaces);
-
-          // Cache in persistent localStorage
-          if (typeof window !== "undefined") {
-            try {
-              localStorage.setItem(
-                storageKey,
-                JSON.stringify({
-                  places: namedPlaces,
-                  timestamp: Date.now(),
-                }),
-              );
-            } catch (e) {}
-          }
-
-          setPlaces(namedPlaces);
-        }
-      })
-      .catch((err) => {
-        // Silently ignore aborted requests
-        if (err.name === "AbortError") return;
-
-        // Silently ignore transient network errors in production
-        // (Failed to fetch usually indicates temporary network issues)
-        if (
-          typeof window !== "undefined" &&
-          window.location.hostname === "localhost"
-        ) {
-          // console.warn("[norby] OSM fetch error:", err);
-        }
-      });
-
-    }, 500); // end debounce
-
-    return () => {
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }
+      abortControllerRef.current = new AbortController();
+
+      const url = `/api/osm?s=${s}&w=${w}&n=${n}&e=${e}`;
+
+      fetch(url, { signal: abortControllerRef.current.signal })
+        .then((res) => {
+          if (!res.ok) throw new Error("Overpass API rate limit or error");
+          return res.json();
+        })
+        .then((data) => {
+          if (data && data.elements) {
+            const namedPlaces = data.elements.filter(
+              (el: OSMPlace) => el.tags && el.tags.name,
+            ) as OSMPlace[];
+
+            // Cache in memory
+            cache.current.set(cacheKey, namedPlaces);
+
+            // Cache in persistent localStorage
+            if (typeof window !== "undefined") {
+              try {
+                localStorage.setItem(
+                  storageKey,
+                  JSON.stringify({
+                    places: namedPlaces,
+                    timestamp: Date.now(),
+                  }),
+                );
+              } catch (e) {}
+            }
+
+            setPlaces(namedPlaces);
+          }
+        })
+        .catch((err) => {
+          if (err.name === "AbortError") return;
+        });
+    }, 500);
+
+    return () => {
       if (debounceTimerRef.current) {
         clearTimeout(debounceTimerRef.current);
       }
     };
   }, [query, zoom]);
+
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
 
   return places;
 }

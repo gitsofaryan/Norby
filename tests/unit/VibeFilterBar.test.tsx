@@ -5,7 +5,7 @@ import { VibeFilterBar } from "../../src/components/Map/overlays/VibeFilterBar";
 const setSelectedFilter = vi.fn();
 const vibrate = vi.fn();
 
-vi.mock("../../src/components/Map/MapProvider", () => ({
+vi.mock("@/components/Map/MapProvider", () => ({
   useMapContext: () => ({ selectedFilter: "all", setSelectedFilter }),
 }));
 

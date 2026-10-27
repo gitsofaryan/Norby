@@ -1,4 +1,4 @@
-import '@testing-library/jest-dom';
+import '@testing-library/jest-dom/vitest';
 import { vi } from 'vitest';
 
 // Mock browser APIs
@@ -37,3 +37,4 @@ if (typeof window !== 'undefined') {
     value: localStorageMock,
   });
 }
+

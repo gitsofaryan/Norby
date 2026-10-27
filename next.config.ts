@@ -12,7 +12,17 @@ const withPWA = withPWAInit({
         urlPattern: ({ url }) =>
           url.hostname === "tile.openstreetmap.org" ||
           url.hostname.endsWith(".tile.openstreetmap.org"),
-        handler: "NetworkOnly",
+        handler: "StaleWhileRevalidate",
+        options: {
+          cacheName: "osm-tiles",
+          expiration: {
+            maxEntries: 1000,
+            maxAgeSeconds: 30 * 24 * 60 * 60, // 30 days
+          },
+          cacheableResponse: {
+            statuses: [0, 200],
+          },
+        },
       },
     ],
   },
@@ -23,7 +33,6 @@ const nextConfig: NextConfig = {
   // src/app/**/dist so it cannot be interpreted as additional routes.
   pageExtensions: ["ts", "tsx"],
   serverExternalPackages: ["ws"],
-  turbopack: {},
   async headers() {
     return [
       {

@@ -1,15 +1,16 @@
 import { Metadata, ResolvingMetadata } from "next";
 import Link from "next/link";
-import { MapPin, Navigation, MessageSquare, Download } from "lucide-react";
+import { MapPin, Navigation, MessageSquare } from "lucide-react";
 
 type Props = {
-  searchParams: { [key: string]: string | string[] | undefined };
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 };
 
 export async function generateMetadata(
-  { searchParams }: Props,
+  props: Props,
   parent: ResolvingMetadata
 ): Promise<Metadata> {
+  const searchParams = await props.searchParams;
   const shortId = (searchParams.id as string) || "hotspot";
   const fullTitle = `Join a Hotspot on Norby`;
   const description = `Someone invited you to a Hotspot on Norby! Join to see the map, route, and jump into the live chat.`;
@@ -31,7 +32,8 @@ export async function generateMetadata(
   };
 }
 
-export default function HotspotSharePage({ searchParams }: Props) {
+export default async function HotspotSharePage(props: Props) {
+  const searchParams = await props.searchParams;
   const shortId = (searchParams.id as string) || "hotspot";
   
   return (

@@ -3,13 +3,14 @@ import Link from "next/link";
 import { Sparkles, Map, UserPlus } from "lucide-react";
 
 type Props = {
-  searchParams: { [key: string]: string | string[] | undefined };
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 };
 
 export async function generateMetadata(
-  { searchParams }: Props,
+  props: Props,
   parent: ResolvingMetadata
 ): Promise<Metadata> {
+  const searchParams = await props.searchParams;
   let username = "A friend";
   const encoded = searchParams.d as string;
   if (encoded) {
@@ -40,7 +41,8 @@ export async function generateMetadata(
   };
 }
 
-export default function InvitePage({ searchParams }: Props) {
+export default async function InvitePage(props: Props) {
+  const searchParams = await props.searchParams;
   let username = "A friend";
   const encoded = searchParams.d as string;
   if (encoded) {

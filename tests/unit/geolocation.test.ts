@@ -134,10 +134,7 @@ describe('useGeolocation', () => {
     const firstGeo = installGeolocation();
     const firstMount = renderHook(() => useGeolocation());
 
-    expect(firstGeo.getCurrentPosition).not.toHaveBeenCalled();
-    act(() => firstMount.result.current.requestLocation());
     expect(firstGeo.getCurrentPosition).toHaveBeenCalledTimes(1);
-
     act(() => firstGeo.getFailure()?.({
       code: 1,
       PERMISSION_DENIED: 1,
@@ -154,7 +151,7 @@ describe('useGeolocation', () => {
     secondMount.unmount();
   });
 
-  it('waits for a tap when browser permission is prompt', async () => {
+  it('requests location on mount when browser permission is undecided (prompt)', async () => {
     localStorage.clear();
     const geo = installGeolocation();
     Object.defineProperty(navigator, 'permissions', {
@@ -167,9 +164,10 @@ describe('useGeolocation', () => {
       await Promise.resolve();
     });
 
-    expect(geo.getCurrentPosition).not.toHaveBeenCalled();
-    act(() => result.current.requestLocation());
     expect(geo.getCurrentPosition).toHaveBeenCalledTimes(1);
+    act(() => geo.getSuccess()?.(devicePosition));
+    expect(result.current.status).toBe('granted');
+    expect(result.current.location).toEqual({ lat: 19.076, lng: 72.8777 });
   });
 
   it('gets a fresh device fix automatically when browser permission is already granted', async () => {
@@ -191,6 +189,7 @@ describe('useGeolocation', () => {
   });
 
   it('honors browser permission if a prior local denial flag is stale', async () => {
+    localStorage.clear();
     localStorage.setItem('norby_location_denied', 'true');
     const geo = installGeolocation();
     Object.defineProperty(navigator, 'permissions', {

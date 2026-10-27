@@ -7,9 +7,11 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./tests/setup.ts'],
     exclude: ['**/node_modules/**', '**/dist/**'],
-    pool: 'threads',
-    maxWorkers: 1,
-    fileParallelism: false,
+    server: {
+      deps: {
+        inline: true,
+      },
+    },
   },
   resolve: {
     alias: {

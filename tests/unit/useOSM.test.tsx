@@ -19,7 +19,7 @@ describe("useOSM", () => {
   beforeEach(() => {
     localStorage.clear();
     fetchMock.mockReset();
-    vi.useFakeTimers();
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
   });
 
   afterEach(() => {
