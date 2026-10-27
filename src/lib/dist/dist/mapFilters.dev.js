@@ -11,7 +11,7 @@ exports.MAP_FILTERS = [{
 }, {
   label: "Dating 💕",
   key: "dating"
-}, // { label: "Gaming 🎮", key: "gaming" },
+}, // { label: "Music 🎵", key: "music" },
 // { label: "Sports 🏃", key: "sports" },
 {
   label: "Side Events 🎟️",
@@ -27,12 +27,7 @@ exports.MAP_FILTERS = [{
   key: "local-eats"
 }, // { label: "Hidden Gems 💎", key: "hidden-gems" },
 // { label: "Community 🤝", key: "community" },
-{
-  label: "Ethereum ⟠",
-  key: "ethereum"
-}, // { label: "AI 🤖", key: "ai" },
-// { label: "DeFi 💸", key: "defi" },
-// { label: "ZK 🔐", key: "zk" },
+// { label: "Ethereum ⟠", key: "ethereum" },
 {
   label: "Hackathons 💻",
   key: "hackathons"
