@@ -7,7 +7,14 @@ vitest_1.describe("Bee prompt", function () {
         var prompt = beePrompt_1.buildBeePrompt({
             userText: "Find me a technical meetup and route",
             location: { lat: 19.076, lng: 72.8777 },
-            hotspots: [{ title: "ZK builders", category: "technical-discussion", lat: 19.08, lng: 72.88 }],
+            hotspots: [
+                {
+                    title: "ZK builders",
+                    category: "technical-discussion",
+                    lat: 19.08,
+                    lng: 72.88
+                },
+            ],
             users: []
         });
         vitest_1.expect(prompt).toContain("Devcon 8");

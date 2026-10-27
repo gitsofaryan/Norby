@@ -1,10 +1,20 @@
-export type SoundType = "pop" | "click" | "ring" | "success" | "error" | "wave" | "connect" | "nearby" | "broadcast";
+export type SoundType =
+  | "pop"
+  | "click"
+  | "ring"
+  | "success"
+  | "error"
+  | "wave"
+  | "connect"
+  | "nearby"
+  | "broadcast";
 
 let sharedCtx: AudioContext | null = null;
 
 const getAudioContext = (): AudioContext | null => {
   if (typeof window === "undefined") return null;
-  const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+  const AudioContextClass =
+    window.AudioContext || (window as any).webkitAudioContext;
   if (!AudioContextClass) return null;
 
   if (!sharedCtx) {
@@ -31,12 +41,15 @@ if (typeof window !== "undefined") {
     const ctx = getAudioContext();
     if (ctx) {
       if (ctx.state === "suspended") {
-        ctx.resume().then(() => {
-          playSilentBuffer(ctx);
-          cleanUp();
-        }).catch((err) => {
-          console.warn("[Norby Audio] Failed to unlock AudioContext:", err);
-        });
+        ctx
+          .resume()
+          .then(() => {
+            playSilentBuffer(ctx);
+            cleanUp();
+          })
+          .catch((err) => {
+            console.warn("[Norby Audio] Failed to unlock AudioContext:", err);
+          });
       } else {
         playSilentBuffer(ctx);
         cleanUp();
@@ -52,7 +65,10 @@ if (typeof window !== "undefined") {
   };
 
   window.addEventListener("click", unlock, { capture: true, passive: true });
-  window.addEventListener("touchstart", unlock, { capture: true, passive: true });
+  window.addEventListener("touchstart", unlock, {
+    capture: true,
+    passive: true,
+  });
   window.addEventListener("touchend", unlock, { capture: true, passive: true });
   window.addEventListener("keydown", unlock, { capture: true, passive: true });
 }
@@ -60,26 +76,29 @@ if (typeof window !== "undefined") {
 export const playSound = (type: SoundType) => {
   if (typeof window === "undefined") return;
   if (localStorage.getItem("norby_mute_sounds") === "true") return;
-  
+
   const ctx = getAudioContext();
   if (!ctx) return;
-  
+
   try {
     // Mobile browsers require the context to be running before scheduling tones.
     if (ctx.state === "suspended") {
-      ctx.resume().then(() => playSound(type)).catch(() => {});
+      ctx
+        .resume()
+        .then(() => playSound(type))
+        .catch(() => {});
       return;
     }
 
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
-    
+
     osc.connect(gain);
     gain.connect(ctx.destination);
-    
+
     const now = ctx.currentTime;
-    
-    switch(type) {
+
+    switch (type) {
       case "pop":
         osc.type = "sine";
         osc.frequency.setValueAtTime(400, now);

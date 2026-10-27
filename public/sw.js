@@ -7,7 +7,7 @@ const STATIC_ASSETS = [
   "/icon-192x192.png",
   "/icon-512x512.png",
   "/apple-touch-icon.png",
-  "https://js.puter.com/v2/"
+  "https://js.puter.com/v2/",
 ];
 
 // Install: pre-cache critical app shell files
@@ -16,9 +16,12 @@ self.addEventListener("install", (event) => {
     caches.open(CACHE_NAME).then((cache) => {
       console.log("[norby-sw] Pre-caching core app shell.");
       return cache.addAll(STATIC_ASSETS).catch((err) => {
-        console.warn("[norby-sw] App shell pre-cache partial match or offline during installation:", err);
+        console.warn(
+          "[norby-sw] App shell pre-cache partial match or offline during installation:",
+          err,
+        );
       });
-    })
+    }),
   );
   self.skipWaiting();
 });
@@ -33,9 +36,9 @@ self.addEventListener("activate", (event) => {
             console.log("[norby-sw] Deleting old cache version:", name);
             return caches.delete(name);
           }
-        })
+        }),
       );
-    })
+    }),
   );
   self.clients.claim();
 });
@@ -46,7 +49,13 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(req.url);
 
   // Skip WebSocket, API, and Puter KV writes
-  if (req.method !== "GET" || url.protocol === "ws:" || url.protocol === "wss:" || url.pathname.includes("/api/") || url.href.includes("puter")) {
+  if (
+    req.method !== "GET" ||
+    url.protocol === "ws:" ||
+    url.protocol === "wss:" ||
+    url.pathname.includes("/api/") ||
+    url.href.includes("puter")
+  ) {
     return;
   }
 
@@ -65,18 +74,20 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(
       caches.open(CACHE_NAME).then((cache) => {
         return cache.match(req).then((cachedResponse) => {
-          const fetchPromise = fetch(req).then((networkResponse) => {
-            if (networkResponse && networkResponse.status === 200) {
-              cache.put(req, networkResponse.clone());
-            }
-            return networkResponse;
-          }).catch(() => {
-            // Fetch failed, return cached response if exists
-            return cachedResponse;
-          });
+          const fetchPromise = fetch(req)
+            .then((networkResponse) => {
+              if (networkResponse && networkResponse.status === 200) {
+                cache.put(req, networkResponse.clone());
+              }
+              return networkResponse;
+            })
+            .catch(() => {
+              // Fetch failed, return cached response if exists
+              return cachedResponse;
+            });
           return cachedResponse || fetchPromise;
         });
-      })
+      }),
     );
     return;
   }
@@ -99,6 +110,6 @@ self.addEventListener("fetch", (event) => {
           // If offline and no cache, return the cached index "/" page
           return caches.match("/");
         });
-      })
+      }),
   );
 });

@@ -17,7 +17,9 @@ const otherHotspot = {
 
 describe("Bee hotspot actions", () => {
   it("creates a categorized hotspot from an explicit command", () => {
-    expect(parseBeeAction("Create a coffee chat called Builders coffee", "me", [])).toEqual({
+    expect(
+      parseBeeAction("Create a coffee chat called Builders coffee", "me", []),
+    ).toEqual({
       type: "create_hotspot",
       title: "Builders coffee",
       category: "coffee-chat",
@@ -37,7 +39,9 @@ describe("Bee hotspot actions", () => {
       type: "close_hotspot",
       roomId: "room_own",
     });
-    expect(parseBeeAction("accept Aria", "me", [ownHotspot, otherHotspot])).toEqual({
+    expect(
+      parseBeeAction("accept Aria", "me", [ownHotspot, otherHotspot]),
+    ).toEqual({
       type: "respond_join",
       roomId: "room_own",
       guestId: "guest-1",

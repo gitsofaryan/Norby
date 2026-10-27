@@ -18,8 +18,12 @@ function buildLiveContext(_a) {
         var hotspotLines = hotspots.slice(0, 8).map(function (hotspot) {
             var label = hotspot.title || "Untitled meetup";
             var category = hotspot.category ? " [" + hotspot.category + "]" : "";
-            var place = hotspot.osm_place_name ? " at " + hotspot.osm_place_name : "";
-            var route = location && typeof hotspot.lat === "number" && typeof hotspot.lng === "number"
+            var place = hotspot.osm_place_name
+                ? " at " + hotspot.osm_place_name
+                : "";
+            var route = location &&
+                typeof hotspot.lat === "number" &&
+                typeof hotspot.lng === "number"
                 ? ", directions: " + directionsUrl(location, { lat: hotspot.lat, lng: hotspot.lng })
                 : "";
             return "- " + label + category + place + route;
@@ -36,10 +40,14 @@ function buildLiveContext(_a) {
         var _a, _b;
         var tags = (_a = user.selectedTags) === null || _a === void 0 ? void 0 : _a.slice(0, 4).join(", ");
         var openTo = (_b = user.openTo) === null || _b === void 0 ? void 0 : _b.slice(0, 3).join(", ");
-        var project = user.projectDescription ? ", building: " + user.projectDescription : "";
+        var project = user.projectDescription
+            ? ", building: " + user.projectDescription
+            : "";
         return "- " + user.username + " " + (user.vibeEmoji || "") + (tags ? ", interests: " + tags : "") + (openTo ? ", open to: " + openTo : "") + project;
     });
-    lines.push(publicUsers.length > 0 ? "Publicly discoverable people:\n" + publicUsers.join("\n") : "Publicly discoverable people: none");
+    lines.push(publicUsers.length > 0
+        ? "Publicly discoverable people:\n" + publicUsers.join("\n")
+        : "Publicly discoverable people: none");
     return lines.join("\n");
 }
 function buildBeePrompt(input) {

@@ -31,7 +31,9 @@ if (typeof window !== "undefined") {
         var ctx = getAudioContext();
         if (ctx) {
             if (ctx.state === "suspended") {
-                ctx.resume().then(function () {
+                ctx
+                    .resume()
+                    .then(function () {
                     playSilentBuffer_1(ctx);
                     cleanUp_1();
                 })["catch"](function (err) {
@@ -51,7 +53,10 @@ if (typeof window !== "undefined") {
         window.removeEventListener("keydown", unlock_1, true);
     };
     window.addEventListener("click", unlock_1, { capture: true, passive: true });
-    window.addEventListener("touchstart", unlock_1, { capture: true, passive: true });
+    window.addEventListener("touchstart", unlock_1, {
+        capture: true,
+        passive: true
+    });
     window.addEventListener("touchend", unlock_1, { capture: true, passive: true });
     window.addEventListener("keydown", unlock_1, { capture: true, passive: true });
 }
@@ -66,7 +71,9 @@ exports.playSound = function (type) {
     try {
         // Mobile browsers require the context to be running before scheduling tones.
         if (ctx.state === "suspended") {
-            ctx.resume().then(function () { return exports.playSound(type); })["catch"](function () { });
+            ctx
+                .resume()
+                .then(function () { return exports.playSound(type); })["catch"](function () { });
             return;
         }
         var osc = ctx.createOscillator();

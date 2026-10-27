@@ -31,11 +31,17 @@ function directionsUrl(from: BeeLocation, to: BeeLocation): string {
   return `https://www.openstreetmap.org/directions?engine=fossgis_osrm_car&route=${encodeURIComponent(route)}`;
 }
 
-function buildLiveContext({ location, hotspots, users }: BeePromptInput): string {
+function buildLiveContext({
+  location,
+  hotspots,
+  users,
+}: BeePromptInput): string {
   const lines: string[] = [];
 
   if (location) {
-    lines.push(`User area: ${location.lat.toFixed(5)}, ${location.lng.toFixed(5)}`);
+    lines.push(
+      `User area: ${location.lat.toFixed(5)}, ${location.lng.toFixed(5)}`,
+    );
   } else {
     lines.push("User area: unavailable");
   }
@@ -44,10 +50,15 @@ function buildLiveContext({ location, hotspots, users }: BeePromptInput): string
     const hotspotLines = hotspots.slice(0, 8).map((hotspot) => {
       const label = hotspot.title || "Untitled meetup";
       const category = hotspot.category ? ` [${hotspot.category}]` : "";
-      const place = hotspot.osm_place_name ? ` at ${hotspot.osm_place_name}` : "";
-      const route = location && typeof hotspot.lat === "number" && typeof hotspot.lng === "number"
-        ? `, directions: ${directionsUrl(location, { lat: hotspot.lat, lng: hotspot.lng })}`
+      const place = hotspot.osm_place_name
+        ? ` at ${hotspot.osm_place_name}`
         : "";
+      const route =
+        location &&
+        typeof hotspot.lat === "number" &&
+        typeof hotspot.lng === "number"
+          ? `, directions: ${directionsUrl(location, { lat: hotspot.lat, lng: hotspot.lng })}`
+          : "";
       return `- ${label}${category}${place}${route}`;
     });
     lines.push("Visible meetups:\n" + hotspotLines.join("\n"));
@@ -61,10 +72,16 @@ function buildLiveContext({ location, hotspots, users }: BeePromptInput): string
     .map((user) => {
       const tags = user.selectedTags?.slice(0, 4).join(", ");
       const openTo = user.openTo?.slice(0, 3).join(", ");
-      const project = user.projectDescription ? `, building: ${user.projectDescription}` : "";
+      const project = user.projectDescription
+        ? `, building: ${user.projectDescription}`
+        : "";
       return `- ${user.username} ${user.vibeEmoji || ""}${tags ? `, interests: ${tags}` : ""}${openTo ? `, open to: ${openTo}` : ""}${project}`;
     });
-  lines.push(publicUsers.length > 0 ? "Publicly discoverable people:\n" + publicUsers.join("\n") : "Publicly discoverable people: none");
+  lines.push(
+    publicUsers.length > 0
+      ? "Publicly discoverable people:\n" + publicUsers.join("\n")
+      : "Publicly discoverable people: none",
+  );
 
   return lines.join("\n");
 }

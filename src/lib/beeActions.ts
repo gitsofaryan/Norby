@@ -11,22 +11,35 @@ export interface BeeActionHotspot {
 export type BeeAction =
   | { type: "create_hotspot"; title: string; category: string }
   | { type: "close_hotspot"; roomId: string }
-  | { type: "respond_join"; roomId: string; guestId: string; status: "accepted" | "declined" };
+  | {
+      type: "respond_join";
+      roomId: string;
+      guestId: string;
+      status: "accepted" | "declined";
+    };
 
 function findCategory(text: string) {
   const normalized = text.toLowerCase();
   return HOTSPOT_CATEGORIES.find((category) =>
-    [category.key, category.label, category.prompt].some((value) => normalized.includes(value.toLowerCase())),
+    [category.key, category.label, category.prompt].some((value) =>
+      normalized.includes(value.toLowerCase()),
+    ),
   );
 }
 
 function titleFromCommand(text: string, category?: { prompt: string }) {
-  const named = text.match(/(?:called|named|titled)\s+["']?(.+?)["']?$/i)?.[1]?.trim();
+  const named = text
+    .match(/(?:called|named|titled)\s+["']?(.+?)["']?$/i)?.[1]
+    ?.trim();
   if (named) return named.slice(0, 100);
   return category?.prompt || "Community meetup";
 }
 
-export function parseBeeAction(text: string, userId: string, hotspots: BeeActionHotspot[]): BeeAction | null {
+export function parseBeeAction(
+  text: string,
+  userId: string,
+  hotspots: BeeActionHotspot[],
+): BeeAction | null {
   const normalized = text.trim().toLowerCase();
   const ownHotspots = hotspots.filter((hotspot) => hotspot.host_id === userId);
 
@@ -37,9 +50,15 @@ export function parseBeeAction(text: string, userId: string, hotspots: BeeAction
     return null;
   }
 
-  const response = normalized.match(/\b(accept|approve|decline|reject)\b(?:\s+(?:the\s+)?(?:request|join request)\s*)?(?:from\s+)?@?([a-z0-9_.-]+)?/i);
+  const response = normalized.match(
+    /\b(accept|approve|decline|reject)\b(?:\s+(?:the\s+)?(?:request|join request)\s*)?(?:from\s+)?@?([a-z0-9_.-]+)?/i,
+  );
   if (response) {
-    const status = response[1].toLowerCase() === "accept" || response[1].toLowerCase() === "approve" ? "accepted" : "declined";
+    const status =
+      response[1].toLowerCase() === "accept" ||
+      response[1].toLowerCase() === "approve"
+        ? "accepted"
+        : "declined";
     const requestedName = response[2];
     const pending = ownHotspots.flatMap((hotspot) =>
       (hotspot.requests || [])
@@ -47,7 +66,9 @@ export function parseBeeAction(text: string, userId: string, hotspots: BeeAction
         .map((request) => ({ hotspot, request })),
     );
     const matches = requestedName
-      ? pending.filter(({ request }) => request.username?.toLowerCase() === requestedName)
+      ? pending.filter(
+          ({ request }) => request.username?.toLowerCase() === requestedName,
+        )
       : pending;
     if (matches.length === 1) {
       return {
@@ -60,7 +81,11 @@ export function parseBeeAction(text: string, userId: string, hotspots: BeeAction
     return null;
   }
 
-  if (/\b(create|creat5e|cretae|start|post|open|make)\b.*\b(hotspot|hostpost|hotspost|meetup|group|chat)\b/.test(normalized)) {
+  if (
+    /\b(create|creat5e|cretae|start|post|open|make)\b.*\b(hotspot|hostpost|hotspost|meetup|group|chat)\b/.test(
+      normalized,
+    )
+  ) {
     const category = findCategory(normalized);
     return {
       type: "create_hotspot",

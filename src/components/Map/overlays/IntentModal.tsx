@@ -83,15 +83,15 @@ export function IntentModal({ osmPlaces = [] }: { osmPlaces?: OSMPlace[] }) {
             </div>
 
             <div className="flex shrink-0 items-center justify-between border-b border-zinc-100 px-5 pb-3 pt-2">
-                <h3 className="text-lg font-bold text-zinc-900">
-                  {myActiveHotspot ? "Active Hotspot" : "Post Intent"}
-                </h3>
-                <button
-                  onClick={() => setShowIntentModal(false)}
-                  className="p-1.5 rounded-full bg-zinc-100 text-zinc-500 hover:bg-zinc-200 transition-colors cursor-pointer"
-                >
-                  <X size={15} />
-                </button>
+              <h3 className="text-lg font-bold text-zinc-900">
+                {myActiveHotspot ? "Active Hotspot" : "Post Intent"}
+              </h3>
+              <button
+                onClick={() => setShowIntentModal(false)}
+                className="p-1.5 rounded-full bg-zinc-100 text-zinc-500 hover:bg-zinc-200 transition-colors cursor-pointer"
+              >
+                <X size={15} />
+              </button>
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-3 pt-3 scrollbar-none">
@@ -164,8 +164,8 @@ export function IntentModal({ osmPlaces = [] }: { osmPlaces?: OSMPlace[] }) {
                           key={s}
                           onClick={() => setIntentText(s)}
                           className={`rounded-full border px-2.5 py-1.5 text-[10px] font-medium transition-colors cursor-pointer ${intentText === s
-                              ? "border-zinc-900 bg-zinc-900 text-white"
-                              : "border-zinc-200 bg-white text-zinc-600 hover:border-zinc-400"
+                            ? "border-zinc-900 bg-zinc-900 text-white"
+                            : "border-zinc-200 bg-white text-zinc-600 hover:border-zinc-400"
                             }`}
                         >
                           {s}
@@ -217,8 +217,8 @@ export function IntentModal({ osmPlaces = [] }: { osmPlaces?: OSMPlace[] }) {
                         <button
                           onClick={() => setSelectedPlaceId(null)}
                           className={`text-left px-3 py-2 rounded-lg text-xs font-medium transition-colors ${selectedPlaceId === null
-                              ? "bg-zinc-900 text-white"
-                              : "bg-white text-zinc-600 hover:bg-zinc-100 border border-zinc-200/50"
+                            ? "bg-zinc-900 text-white"
+                            : "bg-white text-zinc-600 hover:bg-zinc-100 border border-zinc-200/50"
                             }`}
                         >
                           None (Use my exact location)
@@ -228,8 +228,8 @@ export function IntentModal({ osmPlaces = [] }: { osmPlaces?: OSMPlace[] }) {
                             key={place.id}
                             onClick={() => setSelectedPlaceId(place.id)}
                             className={`text-left px-3 py-2 rounded-lg transition-colors flex flex-col gap-0.5 ${selectedPlaceId === place.id
-                                ? "bg-zinc-900 text-white"
-                                : "bg-white text-zinc-600 hover:bg-zinc-100 border border-zinc-200/50"
+                              ? "bg-zinc-900 text-white"
+                              : "bg-white text-zinc-600 hover:bg-zinc-100 border border-zinc-200/50"
                               }`}
                           >
                             <span className="text-xs font-bold truncate">{place.tags.name}</span>

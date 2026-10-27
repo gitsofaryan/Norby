@@ -75,8 +75,8 @@ function saveConversationToLocalStorage(convoId: string, messages: any[]) {
   }
 }
 
-export function ChatProvider({ 
-  children, 
+export function ChatProvider({
+  children,
   socket,
   myUserId,
   handle,
@@ -87,13 +87,13 @@ export function ChatProvider({
   isSignedIn,
   location,
   filteredHotspots
-}: { 
+}: {
   children: React.ReactNode;
   socket: any;
   myUserId: string;
   handle: string;
   myAvatarUrl: string;
-  addToast: (msg: string, type?: "default"|"wave"|"request") => void;
+  addToast: (msg: string, type?: "default" | "wave" | "request") => void;
   setNotifications: React.Dispatch<React.SetStateAction<any[]>>;
   activeUsers: any[];
   isSignedIn: boolean;
@@ -129,7 +129,7 @@ export function ChatProvider({
     unreadSaveTimeoutRef.current = setTimeout(() => {
       try {
         localStorage.setItem("norby_unread_messages", JSON.stringify(unreadMessages));
-      } catch (e) {}
+      } catch (e) { }
     }, 500);
     return () => clearTimeout(unreadSaveTimeoutRef.current);
   }, [unreadMessages]);
@@ -161,7 +161,7 @@ export function ChatProvider({
           .map((r) => (r.sender_id === myUserId ? r.target_id : r.sender_id));
 
         if (acceptedIds.length > 0) {
-          (window as any).puter.kv.set(`friends_list_${myUserId}`, JSON.stringify(acceptedIds)).catch(() => {});
+          (window as any).puter.kv.set(`friends_list_${myUserId}`, JSON.stringify(acceptedIds)).catch(() => { });
         }
       }, 1000);
     }
@@ -194,8 +194,8 @@ export function ChatProvider({
                 return newPlaceholders.length > 0 ? [...prev, ...newPlaceholders] : prev;
               });
             }
-          } catch (e) {}
-        }).catch(() => {});
+          } catch (e) { }
+        }).catch(() => { });
     }
   }, [myUserId, handle, myAvatarUrl, isSignedIn]);
 
@@ -251,7 +251,7 @@ export function ChatProvider({
 
     const activeFriends = activeUsers.filter((u) => friendIds.includes(u.user_id));
     const offlineFriendIds = friendIds.filter(id => !activeUsers.some(u => u.user_id === id));
-    
+
     const offlineFriends = offlineFriendIds.map(id => {
       const requestData = chatRequests.find(r => r.status === "accepted" && (r.sender_id === id || r.target_id === id));
       return {
@@ -284,7 +284,7 @@ export function ChatProvider({
               const oneHourAgo = Date.now() - 60 * 60 * 1000;
               const filteredStorage = newMsgs.filter((m) => m.timestamp > oneHourAgo);
               saveConversationToLocalStorage(convoId, filteredStorage);
-            } catch (e) {}
+            } catch (e) { }
           }
           return newMsgs;
         });
@@ -322,7 +322,7 @@ export function ChatProvider({
               const filtered = list.filter((m: any) => m.timestamp > oneHourAgo);
               saveConversationToLocalStorage(convoId, filtered);
             }
-          } catch (e) {}
+          } catch (e) { }
         }
       }
     });
@@ -412,9 +412,9 @@ export function ChatProvider({
           try {
             const index = JSON.parse(storedIndex).filter((item: any) => item.convoId !== convoId);
             localStorage.setItem("norby_chat_index", JSON.stringify(index));
-          } catch (e) {}
+          } catch (e) { }
         }
-      } catch (e) {}
+      } catch (e) { }
     }
     if (activeChatUserRef.current?.user_id === targetUserId) {
       setChatMessages([]);
@@ -466,7 +466,7 @@ export function ChatProvider({
           const oneHourAgo = Date.now() - 60 * 60 * 1000;
           const filtered = next.filter((m) => m.timestamp > oneHourAgo);
           saveConversationToLocalStorage(convoId, filtered);
-        } catch (e) {}
+        } catch (e) { }
       }
       return next;
     });
@@ -474,7 +474,7 @@ export function ChatProvider({
     if (chatUser.user_id !== "bee_ai_bot") {
       socket.sendDirectMessage(chatUser.user_id, text);
     }
-    
+
     if (chatUser.user_id === "bee_ai_bot") {
       setPeerTyping((prev) => ({ ...prev, bee_ai_bot: true }));
 
@@ -495,7 +495,7 @@ export function ChatProvider({
           try {
             const oneHourAgo = Date.now() - 60 * 60 * 1000;
             localStorage.setItem(`chat_msgs_${convo}`, JSON.stringify(nextMsgs.filter((m) => m.timestamp > oneHourAgo)));
-          } catch (e) {}
+          } catch (e) { }
           return nextMsgs;
         });
       };
@@ -531,7 +531,7 @@ export function ChatProvider({
         hotspots: filteredHotspots || [],
         users: otherUsers,
       });
-      
+
       if (typeof window !== "undefined" && (window as any).puter) {
         (window as any).puter.ai.chat(prompt, { model: 'openai/gpt-4o-mini' })
           .then((response: any) => {
@@ -547,15 +547,15 @@ export function ChatProvider({
             };
             const replyText = getReplyText(response);
             const messages = replyText.split('|||').map((m: string) => m.trim()).filter(Boolean);
-            
+
             messages.forEach((msgTxt: string, index: number) => {
               setTimeout(() => {
                 appendBeeReply(msgTxt);
-                
+
                 if (index === messages.length - 1) {
                   setPeerTyping((prev) => ({ ...prev, bee_ai_bot: false }));
                 }
-              }, index * 1000); 
+              }, index * 1000);
             });
           })
           .catch(() => {

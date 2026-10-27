@@ -256,10 +256,10 @@ export function UserDrawer() {
                                     onClick={() => !isMutedByHost && toggleLocalMic()}
                                     disabled={isMutedByHost}
                                     className={`w-full py-3 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-1.5 shadow-sm ${isMutedByHost
-                                        ? "bg-zinc-100 border-zinc-200 text-zinc-400 cursor-not-allowed"
-                                        : isLocalMicMuted
-                                          ? "bg-white border-zinc-200 text-zinc-800 hover:bg-zinc-50"
-                                          : "bg-zinc-900 border-zinc-900 text-white hover:bg-black"
+                                      ? "bg-zinc-100 border-zinc-200 text-zinc-400 cursor-not-allowed"
+                                      : isLocalMicMuted
+                                        ? "bg-white border-zinc-200 text-zinc-800 hover:bg-zinc-50"
+                                        : "bg-zinc-900 border-zinc-900 text-white hover:bg-black"
                                       }`}
                                   >
                                     {isMutedByHost ? (
@@ -293,10 +293,10 @@ export function UserDrawer() {
                     onClick={() => initiateCall(selectedUser.user_id)}
                     disabled={callStatus === "ringing" || callStatus === "connected" || activeCallUserId === selectedUser.user_id}
                     className={`w-full py-3.5 rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-sm border ${activeCallUserId === selectedUser.user_id || callStatus === "connected"
-                        ? "bg-emerald-50 text-emerald-600 border-emerald-200 cursor-not-allowed"
-                        : callStatus === "ringing"
-                          ? "bg-zinc-850 text-zinc-550 border-zinc-750 cursor-not-allowed"
-                          : "bg-zinc-900 text-white border-zinc-900 hover:bg-black active:scale-[0.98] cursor-pointer"
+                      ? "bg-emerald-50 text-emerald-600 border-emerald-200 cursor-not-allowed"
+                      : callStatus === "ringing"
+                        ? "bg-zinc-850 text-zinc-550 border-zinc-750 cursor-not-allowed"
+                        : "bg-zinc-900 text-white border-zinc-900 hover:bg-black active:scale-[0.98] cursor-pointer"
                       }`}
                   >
                     <Mic size={13} />
@@ -375,8 +375,8 @@ export function UserDrawer() {
                         }
                       }}
                       className={`flex-1 py-3.5 rounded-2xl border text-xs font-bold transition-all flex items-center justify-center gap-1.5 active:scale-[0.98] ${confirmBlock
-                          ? "border-rose-600 bg-rose-600 text-white hover:bg-rose-700"
-                          : "border-rose-200 hover:bg-rose-50 text-rose-600"
+                        ? "border-rose-600 bg-rose-600 text-white hover:bg-rose-700"
+                        : "border-rose-200 hover:bg-rose-50 text-rose-600"
                         }`}
                     >
                       {confirmBlock ? "Confirm Block?" : "Block / Report"}
@@ -386,8 +386,8 @@ export function UserDrawer() {
                       onClick={handleWave}
                       disabled={hasWaved}
                       className={`flex-1 py-3.5 rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${hasWaved
-                          ? "bg-emerald-500 text-white"
-                          : "bg-zinc-900 text-white hover:bg-black active:scale-[0.98]"
+                        ? "bg-emerald-500 text-white"
+                        : "bg-zinc-900 text-white hover:bg-black active:scale-[0.98]"
                         }`}
                     >
                       {hasWaved ? "Waved! 👋" : "Wave 👋"}
@@ -406,8 +406,8 @@ export function UserDrawer() {
                         }
                       }}
                       className={`flex-1 py-3.5 rounded-2xl border text-xs font-bold transition-all flex items-center justify-center gap-1.5 active:scale-[0.98] ${confirmBlock
-                          ? "border-rose-600 bg-rose-600 text-white hover:bg-rose-700"
-                          : "border-rose-200 hover:bg-rose-50 text-rose-600"
+                        ? "border-rose-600 bg-rose-600 text-white hover:bg-rose-700"
+                        : "border-rose-200 hover:bg-rose-50 text-rose-600"
                         }`}
                     >
                       {confirmBlock ? "Confirm Block?" : "Block / Report"}
