@@ -293,12 +293,12 @@ export function MapProvider({ children }: { children: React.ReactNode }) {
   const [intents, setIntents] = useState<any[]>([]);
 
   // Chat states have been moved to ChatProvider
-  
+
   // 1-to-1 Calling state
   const [incomingCall, setIncomingCall] = useState<{ caller_id: string; caller_username: string; caller_avatar?: string } | null>(null);
   const [callStatus, setCallStatus] = useState<"ringing" | "connected" | null>(null);
   const [outgoingCallUserId, setOutgoingCallUserId] = useState<string | null>(null);
-  
+
   // Routing state
   const [activeRoute, setActiveRoute] = useState<RouteData | null>(null);
   const [activeRouteMode, setActiveRouteMode] = useState<TransportMode>("foot");
@@ -442,18 +442,18 @@ export function MapProvider({ children }: { children: React.ReactNode }) {
       }
       setActiveUsers(Array.from(userMap.values()));
       setIntents(msg.hotspots || []);
-      
+
       requestAnimationFrame(() => {
         if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
-        
+
         performance.mark("sync-end");
         performance.measure("norby_client_sync_render_duration", "sync-start", "sync-end");
         const measures = performance.getEntriesByName("norby_client_sync_render_duration");
         const last = measures[measures.length - 1];
-        
+
         // Ignore massive outliers and normal frame variation (flag only >100ms frame updates)
         if (last && last.duration > 100 && last.duration < 1000) {
-           // console.warn(`[norby metrics] Slow render detected: ${last.duration.toFixed(2)}ms for ${msg.users.length} users`);
+          // console.warn(`[norby metrics] Slow render detected: ${last.duration.toFixed(2)}ms for ${msg.users.length} users`);
         }
       });
     },
@@ -609,7 +609,7 @@ export function MapProvider({ children }: { children: React.ReactNode }) {
       playSound("click");
       globalEventBus.emit("chat:new_dm", msg);
     },
-    onDMHistory: (msg) => {},
+    onDMHistory: (msg) => { },
     onTypingIndicator: (msg) => globalEventBus.emit("chat:typing_indicator", msg),
     onChatsList: (msg) => globalEventBus.emit("chat:chats_list", msg),
     onRtcOffer: webRTC.handleRtcOffer,
@@ -641,7 +641,7 @@ export function MapProvider({ children }: { children: React.ReactNode }) {
       const isAccepted = msg.status === "accepted";
       const otherInfo = activeUsers.find((u) => u.user_id === msg.responder_id);
       const otherHandle = otherInfo?.username || "user";
-      
+
       setNotifications((prev) => [
         {
           id: Math.random().toString(36).substring(7),

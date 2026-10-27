@@ -20,11 +20,10 @@ export function VibeFilterBar() {
           <button
             key={f.key}
             onClick={() => handleFilterClick(f.key)}
-            className={`px-3.5 py-1.5 rounded-full border text-[11px] font-semibold whitespace-nowrap shrink-0 transition-all duration-150 cursor-pointer ${
-              selectedFilter === f.key
+            className={`px-3.5 py-1.5 rounded-full border text-[11px] font-semibold whitespace-nowrap shrink-0 transition-all duration-150 cursor-pointer ${selectedFilter === f.key
                 ? "bg-zinc-900 border-zinc-900 text-white shadow-sm"
                 : "bg-white/95 border-zinc-200 text-zinc-600 shadow-sm"
-            }`}
+              }`}
           >
             {f.label}
           </button>
