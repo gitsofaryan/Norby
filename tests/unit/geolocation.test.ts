@@ -125,10 +125,17 @@ describe('useGeolocation', () => {
     expect(result.current.location).toBeNull();
   });
 
-  it('attempts native location once on entry and does not repeat after denial', () => {
+  it('waits for the location control gesture and does not repeat after denial', () => {
     localStorage.clear();
+    Object.defineProperty(navigator, 'permissions', {
+      configurable: true,
+      value: undefined,
+    });
     const firstGeo = installGeolocation();
     const firstMount = renderHook(() => useGeolocation());
+
+    expect(firstGeo.getCurrentPosition).not.toHaveBeenCalled();
+    act(() => firstMount.result.current.requestLocation());
     expect(firstGeo.getCurrentPosition).toHaveBeenCalledTimes(1);
 
     act(() => firstGeo.getFailure()?.({
@@ -147,6 +154,24 @@ describe('useGeolocation', () => {
     secondMount.unmount();
   });
 
+  it('waits for a tap when browser permission is prompt', async () => {
+    localStorage.clear();
+    const geo = installGeolocation();
+    Object.defineProperty(navigator, 'permissions', {
+      configurable: true,
+      value: { query: vi.fn().mockResolvedValue({ state: 'prompt' }) },
+    });
+    const { result } = renderHook(() => useGeolocation());
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(geo.getCurrentPosition).not.toHaveBeenCalled();
+    act(() => result.current.requestLocation());
+    expect(geo.getCurrentPosition).toHaveBeenCalledTimes(1);
+  });
+
   it('gets a fresh device fix automatically when browser permission is already granted', async () => {
     localStorage.clear();
     const geo = installGeolocation();
@@ -162,6 +187,24 @@ describe('useGeolocation', () => {
     act(() => geo.getSuccess()?.(devicePosition));
 
     expect(geo.getCurrentPosition).toHaveBeenCalledTimes(1);
+    expect(result.current.location).toEqual({ lat: 19.076, lng: 72.8777 });
+  });
+
+  it('honors browser permission if a prior local denial flag is stale', async () => {
+    localStorage.setItem('norby_location_denied', 'true');
+    const geo = installGeolocation();
+    Object.defineProperty(navigator, 'permissions', {
+      configurable: true,
+      value: { query: vi.fn().mockResolvedValue({ state: 'granted' }) },
+    });
+    const { result } = renderHook(() => useGeolocation());
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(geo.getCurrentPosition).toHaveBeenCalledTimes(1);
+    act(() => geo.getSuccess()?.(devicePosition));
     expect(result.current.location).toEqual({ lat: 19.076, lng: 72.8777 });
   });
 

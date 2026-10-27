@@ -178,21 +178,19 @@ export function useGeolocation(maskLocation = true) {
     acquireDeviceLocation(true);
   }, [acquireDeviceLocation]);
 
-  // Make one native browser request on entry when location has not already
-  // been enabled. Remember denial so reloads do not repeatedly trigger it.
-  // The map's existing recenter control calls requestLocation for a user-led
-  // retry. Permission query is optional because Safari support varies.
+  // Restore location automatically only when the browser already grants it.
+  // When a prompt is needed, the existing map control calls requestLocation
+  // directly from the user's tap so mobile browsers can show their native UI.
   useEffect(() => {
     if (locationEnabled || autoRequestStartedRef.current) return;
     autoRequestStartedRef.current = true;
 
+    let wasPreviouslyDenied = false;
     try {
-      if (localStorage.getItem(LOCATION_DENIED_KEY) === "true") {
-        setStatus("denied");
-        return;
-      }
+      wasPreviouslyDenied =
+        localStorage.getItem(LOCATION_DENIED_KEY) === "true";
     } catch {
-      // Continue with a single browser request if storage cannot be read.
+      // Permission state can still be queried if storage is unavailable.
     }
 
     if (typeof window !== "undefined" && window.isSecureContext === false) {
@@ -214,13 +212,19 @@ export function useGeolocation(maskLocation = true) {
             } as GeolocationPositionError);
             return;
           }
-          acquireDeviceLocation();
+          if (permission.state === "granted") {
+            acquireDeviceLocation();
+            return;
+          }
+          if (wasPreviouslyDenied) setStatus("denied");
         })
-        .catch(() => acquireDeviceLocation());
+        .catch(() => {
+          if (wasPreviouslyDenied) setStatus("denied");
+        });
       return;
     }
 
-    acquireDeviceLocation();
+    if (wasPreviouslyDenied) setStatus("denied");
   }, [locationEnabled, acquireDeviceLocation, handlePositionError]);
 
   // Returning users who previously allowed location get a fresh device fix.
