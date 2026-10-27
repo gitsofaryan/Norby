@@ -1,18 +1,7 @@
 "use client";
 
 import { useMapContext } from "../MapProvider";
-
-const VIBE_FILTERS = [
-  { label: "All", key: "all" },
-  { label: "Café ☕", key: "cafe" },
-  { label: "Dating 💕", key: "dating" },
-  { label: "Gaming 🎮", key: "gaming" },
-  { label: "Movies 🎬", key: "movies" },
-  { label: "Study 📚", key: "study" },
-  { label: "Music 🎵", key: "music" },
-  { label: "Sports 🏃", key: "sports" },
-  { label: "Chill 🌙", key: "chill" },
-];
+import { MAP_FILTERS } from "@/lib/mapFilters";
 
 export function VibeFilterBar() {
   const { selectedFilter, setSelectedFilter } = useMapContext();
@@ -27,7 +16,7 @@ export function VibeFilterBar() {
   return (
     <div id="vibe-filter-bar" className="pointer-events-auto absolute top-4 left-4 right-4 z-[410]">
       <div className="flex gap-2 overflow-x-auto scrollbar-none [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] pb-0.5">
-        {VIBE_FILTERS.map((f) => (
+        {MAP_FILTERS.map((f) => (
           <button
             key={f.key}
             onClick={() => handleFilterClick(f.key)}

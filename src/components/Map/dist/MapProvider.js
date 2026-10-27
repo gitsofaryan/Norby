@@ -11,6 +11,13 @@ var __assign = (this && this.__assign) || function () {
     };
     return __assign.apply(this, arguments);
 };
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -55,43 +62,72 @@ var __spreadArrays = (this && this.__spreadArrays) || function () {
     return r;
 };
 exports.__esModule = true;
-exports.useDMContext = exports.useSocialContext = exports.useMapContext = exports.MapProvider = void 0;
+exports.useMapContext = exports.MapProvider = void 0;
 var react_1 = require("react");
 var useAuth_1 = require("@/hooks/useAuth");
 var useGeolocation_1 = require("@/hooks/useGeolocation");
 var useSocket_1 = require("@/hooks/useSocket");
 var useWebRTC_1 = require("@/hooks/useWebRTC");
 var routing_1 = require("@/lib/routing");
+var eventBus_1 = require("@/lib/eventBus");
+var sounds_1 = require("@/lib/sounds");
+var mapFilters_1 = require("@/lib/mapFilters");
+var ChatProvider_1 = require("./ChatProvider");
+var ChatProvider_2 = require("./ChatProvider");
+__createBinding(exports, ChatProvider_2, "SocialContext");
+__createBinding(exports, ChatProvider_2, "DMContext");
+__createBinding(exports, ChatProvider_2, "useSocialContext");
+__createBinding(exports, ChatProvider_2, "useDMContext");
+__createBinding(exports, ChatProvider_2, "type");
+__createBinding(exports, ChatProvider_2, "type");
 var MapContext = react_1.createContext(undefined);
-var SocialContext = react_1.createContext(undefined);
-var DMContext = react_1.createContext(undefined);
 function MapProvider(_a) {
     var _this = this;
     var _b;
     var children = _a.children;
     var _c = useAuth_1.useAuth(), isSignedIn = _c.isSignedIn, user = _c.user, profile = _c.profile, blockUser = _c.blockUser;
-    var myUserId = (user === null || user === void 0 ? void 0 : user.id) || (user === null || user === void 0 ? void 0 : user.username) ||
-        (typeof window !== "undefined" ? localStorage.getItem("noirme_anon_id") : null) ||
+    var _d = react_1.useState(null), anonDetails = _d[0], setAnonDetails = _d[1];
+    react_1.useEffect(function () {
+        if (typeof window !== "undefined") {
+            var anonId = localStorage.getItem("norby_anon_id");
+            var anonHandle = localStorage.getItem("norby_anon_handle");
+            if (!anonId) {
+                anonId = "anon_" + Math.random().toString(36).substring(2, 10);
+                localStorage.setItem("norby_anon_id", anonId);
+            }
+            if (!anonHandle) {
+                var adjs = ["Swift", "Silent", "Neon", "Stellar", "Lunar", "Cosmic", "Urban", "Phantom", "Retro", "Vapor", "Vibrant", "Crypto"];
+                var nouns = ["Ghost", "Nomad", "Rider", "Shadow", "Seeker", "Drifter", "Pulse", "Volt", "Zenith", "Spark", "Wave", "Echo"];
+                var adj = adjs[Math.floor(Math.random() * adjs.length)];
+                var noun = nouns[Math.floor(Math.random() * nouns.length)];
+                var num = Math.floor(100 + Math.random() * 900); // 100-999
+                anonHandle = "" + adj + noun + "_" + num;
+                localStorage.setItem("norby_anon_handle", anonHandle);
+            }
+            setAnonDetails({ id: anonId, handle: anonHandle });
+        }
+    }, []);
+    var myUserId = (user === null || user === void 0 ? void 0 : user.id) || (user === null || user === void 0 ? void 0 : user.username) || (anonDetails === null || anonDetails === void 0 ? void 0 : anonDetails.id) ||
         "anon";
-    var handle = (profile === null || profile === void 0 ? void 0 : profile.handle) || (user === null || user === void 0 ? void 0 : user.username) || "";
+    var handle = (profile === null || profile === void 0 ? void 0 : profile.handle) || (user === null || user === void 0 ? void 0 : user.username) || (anonDetails === null || anonDetails === void 0 ? void 0 : anonDetails.handle) || "";
     var vibeEmoji = (profile === null || profile === void 0 ? void 0 : profile.vibeEmoji) || "☕";
     var myAvatarUrl = (profile === null || profile === void 0 ? void 0 : profile.avatar_url) || (user ? useAuth_1.getAvatarUrl(user.username) : useAuth_1.getAvatarUrl("anon"));
-    var _d = react_1.useState(function () {
+    var _e = react_1.useState(function () {
         if (typeof window !== "undefined") {
             try {
-                return JSON.parse(localStorage.getItem("noirme_local_blocks") || "[]");
+                return JSON.parse(localStorage.getItem("norby_local_blocks") || "[]");
             }
             catch (_a) {
                 return [];
             }
         }
         return [];
-    }), localBlocks = _d[0], setLocalBlocks = _d[1];
+    }), localBlocks = _e[0], setLocalBlocks = _e[1];
     // Sync with local storage events (for unblocking from profile page)
     react_1.useEffect(function () {
         var syncBlocks = function () {
             try {
-                var local = JSON.parse(localStorage.getItem("noirme_local_blocks") || "[]");
+                var local = JSON.parse(localStorage.getItem("norby_local_blocks") || "[]");
                 setLocalBlocks(local);
             }
             catch (e) { }
@@ -100,14 +136,15 @@ function MapProvider(_a) {
         return function () { return window.removeEventListener("storage", syncBlocks); };
     }, []);
     // UI state
-    var _e = react_1.useState(15), zoom = _e[0], setZoom = _e[1];
-    var _f = react_1.useState(0), recenterTrigger = _f[0], setRecenterTrigger = _f[1];
-    var _g = react_1.useState(true), followUser = _g[0], setFollowUser = _g[1];
-    var _h = react_1.useState(false), isInteracting = _h[0], setIsInteracting = _h[1];
-    var _j = react_1.useState("all"), selectedFilter = _j[0], setSelectedFilter = _j[1];
-    var _k = react_1.useState(false), isSpeakerMuted = _k[0], setIsSpeakerMuted = _k[1];
-    var _l = react_1.useState(null), selectedUser = _l[0], setSelectedUser = _l[1];
-    var _m = react_1.useState(null), selectedHotspot = _m[0], _setSelectedHotspot = _m[1];
+    var _f = react_1.useState(15), zoom = _f[0], setZoom = _f[1];
+    var _g = react_1.useState(0), recenterTrigger = _g[0], setRecenterTrigger = _g[1];
+    var _h = react_1.useState(true), followUser = _h[0], setFollowUser = _h[1];
+    var _j = react_1.useState(false), isInteracting = _j[0], setIsInteracting = _j[1];
+    var _k = react_1.useState("all"), selectedFilter = _k[0], setSelectedFilter = _k[1];
+    var _l = react_1.useState(false), isSpeakerMuted = _l[0], setIsSpeakerMuted = _l[1];
+    var _m = react_1.useState(null), selectedUser = _m[0], setSelectedUser = _m[1];
+    var _o = react_1.useState(null), selectedHotspot = _o[0], _setSelectedHotspot = _o[1];
+    var _p = react_1.useState(false), showSpaceDrawer = _p[0], setShowSpaceDrawer = _p[1];
     var selectedHotspotRef = react_1.useRef(null);
     var setSelectedHotspot = function (val) {
         if (typeof val === "function") {
@@ -120,26 +157,26 @@ function MapProvider(_a) {
             _setSelectedHotspot(val);
         }
     };
-    var _o = react_1.useState(false), showIntentModal = _o[0], setShowIntentModal = _o[1];
-    var _p = react_1.useState(""), intentText = _p[0], setIntentText = _p[1];
-    var _q = react_1.useState(15), customHotspotRange = _q[0], setCustomHotspotRange = _q[1];
+    var _q = react_1.useState(false), showIntentModal = _q[0], setShowIntentModal = _q[1];
+    var _r = react_1.useState(""), intentText = _r[0], setIntentText = _r[1];
+    var _s = react_1.useState(15), customHotspotRange = _s[0], setCustomHotspotRange = _s[1];
     react_1.useEffect(function () {
         if (showIntentModal) {
             setCustomHotspotRange((profile === null || profile === void 0 ? void 0 : profile.hotspotRange) || 15);
         }
     }, [showIntentModal, profile === null || profile === void 0 ? void 0 : profile.hotspotRange]);
-    var _r = react_1.useState(false), hasWaved = _r[0], setHasWaved = _r[1];
-    var _s = react_1.useState(false), confirmBlock = _s[0], setConfirmBlock = _s[1];
+    var _t = react_1.useState(false), hasWaved = _t[0], setHasWaved = _t[1];
+    var _u = react_1.useState(false), confirmBlock = _u[0], setConfirmBlock = _u[1];
     react_1.useEffect(function () {
         setHasWaved(false);
         setConfirmBlock(false);
     }, [selectedUser]);
     // Notifications and Toast streams
-    var _t = react_1.useState([]), toasts = _t[0], setToasts = _t[1];
-    var _u = react_1.useState([]), notifications = _u[0], setNotifications = _u[1];
-    var _v = react_1.useState(false), showNotifDropdown = _v[0], setShowNotifDropdown = _v[1];
-    var _w = react_1.useState([]), activeWaves = _w[0], setActiveWaves = _w[1];
-    var addToast = function (message, type) {
+    var _v = react_1.useState([]), toasts = _v[0], setToasts = _v[1];
+    var _w = react_1.useState([]), notifications = _w[0], setNotifications = _w[1];
+    var _x = react_1.useState(false), showNotifDropdown = _x[0], setShowNotifDropdown = _x[1];
+    var _y = react_1.useState([]), activeWaves = _y[0], setActiveWaves = _y[1];
+    var addToast = react_1.useCallback(function (message, type) {
         if (type === void 0) { type = "default"; }
         var id = Math.random().toString(36).substring(2, 9);
         setToasts(function (prev) {
@@ -152,7 +189,7 @@ function MapProvider(_a) {
         setTimeout(function () {
             setToasts(function (prev) { return prev.filter(function (t) { return t.id !== id; }); });
         }, 4000);
-    };
+    }, []);
     react_1.useEffect(function () {
         var interval = setInterval(function () {
             var now = Date.now();
@@ -162,190 +199,24 @@ function MapProvider(_a) {
     }, []);
     // Geolocation
     var maskLocation = (_b = profile === null || profile === void 0 ? void 0 : profile.maskLocation) !== null && _b !== void 0 ? _b : true;
-    var _x = useGeolocation_1.useGeolocation(maskLocation), location = _x.location, locStatus = _x.status, isStasis = _x.isStasis, accuracy = _x.accuracy, accuracySource = _x.accuracySource, refreshLocation = _x.refreshLocation;
+    var _z = useGeolocation_1.useGeolocation(maskLocation), location = _z.location, locStatus = _z.status, isStasis = _z.isStasis, accuracy = _z.accuracy, accuracySource = _z.accuracySource, refreshLocation = _z.refreshLocation;
     // Sync lists from socket
-    var _y = react_1.useState([]), activeUsers = _y[0], setActiveUsers = _y[1];
-    var _z = react_1.useState([]), intents = _z[0], setIntents = _z[1];
-    // Chat states
-    var _0 = react_1.useState([]), chatRequests = _0[0], setChatRequests = _0[1];
-    var chatRequestsRef = react_1.useRef([]);
-    react_1.useEffect(function () {
-        chatRequestsRef.current = chatRequests;
-    }, [chatRequests]);
-    var _1 = react_1.useState(null), activeChatUser = _1[0], _setActiveChatUser = _1[1];
-    var activeChatUserRef = react_1.useRef(null);
-    var setActiveChatUser = function (val) {
-        activeChatUserRef.current = val;
-        _setActiveChatUser(val);
-    };
-    var _2 = react_1.useState([]), chatMessages = _2[0], setChatMessages = _2[1];
-    var _3 = react_1.useState({}), peerTyping = _3[0], setPeerTyping = _3[1];
-    var _4 = react_1.useState(false), isLoadingHistory = _4[0], setIsLoadingHistory = _4[1];
-    // Unread messages tracking (debounced localStorage save)
-    var _5 = react_1.useState(function () {
-        if (typeof window !== "undefined") {
-            try {
-                return JSON.parse(localStorage.getItem("noirme_unread_messages") || "{}");
-            }
-            catch (e) {
-                return {};
-            }
-        }
-        return {};
-    }), unreadMessages = _5[0], setUnreadMessages = _5[1];
-    var unreadSaveTimeoutRef = react_1.useRef(null);
-    react_1.useEffect(function () {
-        if (unreadSaveTimeoutRef.current) {
-            clearTimeout(unreadSaveTimeoutRef.current);
-        }
-        unreadSaveTimeoutRef.current = setTimeout(function () {
-            try {
-                localStorage.setItem("noirme_unread_messages", JSON.stringify(unreadMessages));
-            }
-            catch (e) {
-                console.warn("[noirme] Failed to save unread messages to localStorage");
-            }
-        }, 500);
-        return function () {
-            if (unreadSaveTimeoutRef.current) {
-                clearTimeout(unreadSaveTimeoutRef.current);
-            }
-        };
-    }, [unreadMessages]);
-    var unreadMessagesCount = react_1.useMemo(function () {
-        return Object.values(unreadMessages).reduce(function (a, b) { return a + b; }, 0);
-    }, [unreadMessages]);
-    // Clear unread count when activeChatUser changes
-    react_1.useEffect(function () {
-        if (activeChatUser) {
-            setUnreadMessages(function (prev) {
-                if (!prev[activeChatUser.user_id])
-                    return prev;
-                var copy = __assign({}, prev);
-                delete copy[activeChatUser.user_id];
-                return copy;
-            });
-        }
-    }, [activeChatUser]);
-    // Save accepted friends to Puter KV as a string array (debounced)
-    var friendsSaveTimeoutRef = react_1.useRef(null);
-    react_1.useEffect(function () {
-        if (!myUserId || myUserId === "anon")
-            return;
-        if (typeof window !== "undefined" && window.puter) {
-            if (friendsSaveTimeoutRef.current) {
-                clearTimeout(friendsSaveTimeoutRef.current);
-            }
-            friendsSaveTimeoutRef.current = setTimeout(function () {
-                var acceptedIds = chatRequests
-                    .filter(function (r) { return r.status === "accepted"; })
-                    .map(function (r) { return (r.sender_id === myUserId ? r.target_id : r.sender_id); });
-                if (acceptedIds.length > 0) {
-                    window.puter.kv.set("friends_list_" + myUserId, JSON.stringify(acceptedIds))["catch"](function (err) { return console.warn("[noirme] Failed to save friends list"); });
-                }
-            }, 1000);
-        }
-        return function () {
-            if (friendsSaveTimeoutRef.current) {
-                clearTimeout(friendsSaveTimeoutRef.current);
-            }
-        };
-    }, [chatRequests, myUserId]);
-    // Load accepted friends from Puter KV on login (instant load, runs once per session)
-    var friendsLoadedRef = react_1.useRef(false);
-    react_1.useEffect(function () {
-        if (friendsLoadedRef.current || !myUserId || myUserId === "anon")
-            return;
-        if (typeof window !== "undefined" && window.puter) {
-            friendsLoadedRef.current = true;
-            window.puter.kv.get("friends_list_" + myUserId)
-                .then(function (raw) {
-                if (!raw)
-                    return;
-                try {
-                    var friendIds_1 = JSON.parse(raw);
-                    if (Array.isArray(friendIds_1) && friendIds_1.length > 0) {
-                        setChatRequests(function (prev) {
-                            var existingIds = new Set(prev.map(function (r) { return r.sender_id === myUserId ? r.target_id : r.sender_id; }));
-                            var newPlaceholders = friendIds_1
-                                .filter(function (id) { return !existingIds.has(id); })
-                                .map(function (id) { return ({
-                                sender_id: myUserId,
-                                sender_username: handle || myUserId,
-                                sender_avatar: myAvatarUrl,
-                                target_id: id,
-                                status: "accepted",
-                                timestamp: Date.now()
-                            }); });
-                            return newPlaceholders.length > 0 ? __spreadArrays(prev, newPlaceholders) : prev;
-                        });
-                    }
-                }
-                catch (e) {
-                    console.warn("[noirme] Failed to parse friends list from Puter KV");
-                }
-            })["catch"](function (err) { return console.warn("[noirme] Failed to load friends list from Puter KV"); });
-        }
-    }, [myUserId, handle, myAvatarUrl]);
-    // Load DM history from localStorage only (device-local, no server)
-    react_1.useEffect(function () {
-        if (!activeChatUser || !myUserId || myUserId === "anon") {
-            setChatMessages([]);
-            setIsLoadingHistory(false);
-            return;
-        }
-        var targetUserId = activeChatUser.user_id;
-        var convoId = [myUserId, targetUserId].sort().join(":");
-        if (typeof window !== "undefined") {
-            try {
-                var stored = localStorage.getItem("chat_msgs_" + convoId);
-                if (stored) {
-                    var msgs = JSON.parse(stored);
-                    var oneHourAgo_1 = Date.now() - 60 * 60 * 1000;
-                    var validMsgs = msgs.filter(function (m) { return m.timestamp > oneHourAgo_1; });
-                    setChatMessages(validMsgs);
-                    localStorage.setItem("chat_msgs_" + convoId, JSON.stringify(validMsgs));
-                }
-                else {
-                    setChatMessages([]);
-                }
-            }
-            catch (e) {
-                console.warn("[noirme] Failed to load chat from localStorage");
-                setChatMessages([]);
-            }
-        }
-        setIsLoadingHistory(false);
-    }, [activeChatUser === null || activeChatUser === void 0 ? void 0 : activeChatUser.user_id, myUserId]);
-    var friends = react_1.useMemo(function () {
-        return chatRequests
-            .filter(function (r) { return r.status === "accepted"; })
-            .map(function (r) {
-            var friendId = r.sender_id === myUserId ? r.target_id : r.sender_id;
-            var latestInfo = activeUsers.find(function (u) { return u.user_id === friendId; });
-            return {
-                user_id: friendId,
-                username: r.sender_id === myUserId ? ((latestInfo === null || latestInfo === void 0 ? void 0 : latestInfo.username) || r.target_id) : r.sender_username,
-                avatar_url: r.sender_id === myUserId ? ((latestInfo === null || latestInfo === void 0 ? void 0 : latestInfo.avatar_url) || "") : r.sender_avatar,
-                vibeEmoji: (latestInfo === null || latestInfo === void 0 ? void 0 : latestInfo.vibeEmoji) || "☕",
-                bio: (latestInfo === null || latestInfo === void 0 ? void 0 : latestInfo.bio) || "",
-                selectedTags: (latestInfo === null || latestInfo === void 0 ? void 0 : latestInfo.selectedTags) || [],
-                lat: latestInfo === null || latestInfo === void 0 ? void 0 : latestInfo.lat,
-                lng: latestInfo === null || latestInfo === void 0 ? void 0 : latestInfo.lng,
-                last_seen: latestInfo === null || latestInfo === void 0 ? void 0 : latestInfo.last_seen,
-                status: (latestInfo === null || latestInfo === void 0 ? void 0 : latestInfo.status) || "active"
-            };
-        });
-    }, [chatRequests, activeUsers, myUserId]);
+    var _0 = react_1.useState([]), activeUsers = _0[0], setActiveUsers = _0[1];
+    var _1 = react_1.useState([]), intents = _1[0], setIntents = _1[1];
+    // Chat states have been moved to ChatProvider
+    // 1-to-1 Calling state
+    var _2 = react_1.useState(null), incomingCall = _2[0], setIncomingCall = _2[1];
+    var _3 = react_1.useState(null), callStatus = _3[0], setCallStatus = _3[1];
+    var _4 = react_1.useState(null), outgoingCallUserId = _4[0], setOutgoingCallUserId = _4[1];
     // Routing state
-    var _6 = react_1.useState(null), activeRoute = _6[0], setActiveRoute = _6[1];
-    var _7 = react_1.useState("foot"), activeRouteMode = _7[0], setActiveRouteMode = _7[1];
-    var _8 = react_1.useState(null), routingTarget = _8[0], setRoutingTarget = _8[1];
-    var _9 = react_1.useState(false), isLoadingRoute = _9[0], setIsLoadingRoute = _9[1];
-    var clearActiveRoute = function () {
+    var _5 = react_1.useState(null), activeRoute = _5[0], setActiveRoute = _5[1];
+    var _6 = react_1.useState("foot"), activeRouteMode = _6[0], setActiveRouteMode = _6[1];
+    var _7 = react_1.useState(null), routingTarget = _7[0], setRoutingTarget = _7[1];
+    var _8 = react_1.useState(false), isLoadingRoute = _8[0], setIsLoadingRoute = _8[1];
+    var clearActiveRoute = react_1.useCallback(function () {
         setActiveRoute(null);
         setRoutingTarget(null);
-    };
+    }, []);
     var lastFetchedLocationRef = react_1.useRef(null);
     react_1.useEffect(function () {
         if (!location || !routingTarget) {
@@ -370,7 +241,7 @@ function MapProvider(_a) {
                 setIsLoadingRoute(false);
             }
         })["catch"](function (err) {
-            console.error("[noirme] Route fetch failed:", err);
+            console.error("[norby] Route fetch failed:", err);
             if (active) {
                 setIsLoadingRoute(false);
                 addToast("Failed to calculate route", "default");
@@ -407,10 +278,43 @@ function MapProvider(_a) {
     var socketMethodsRef = react_1.useRef(null);
     var webRTC = useWebRTC_1.useWebRTC({
         myUserId: myUserId,
+        myUsername: handle,
+        myAvatarUrl: myAvatarUrl,
         sendRtcOffer: function (target, offer) { var _a; return (_a = socketMethodsRef.current) === null || _a === void 0 ? void 0 : _a.sendRtcOffer(target, offer); },
         sendRtcAnswer: function (target, answer) { var _a; return (_a = socketMethodsRef.current) === null || _a === void 0 ? void 0 : _a.sendRtcAnswer(target, answer); },
         sendRtcIceCandidate: function (target, cand) { var _a; return (_a = socketMethodsRef.current) === null || _a === void 0 ? void 0 : _a.sendRtcIceCandidate(target, cand); }
     });
+    react_1.useEffect(function () {
+        if (webRTC.isBroadcastingAudio && webRTC.isSpaceHost) {
+            setShowSpaceDrawer(true);
+        }
+        else {
+            setShowSpaceDrawer(false);
+        }
+    }, [webRTC.isBroadcastingAudio, webRTC.isSpaceHost]);
+    // Detect newly created hotspots nearby
+    var prevIntentsRef = react_1.useRef([]);
+    react_1.useEffect(function () {
+        if (prevIntentsRef.current.length > 0 && intents.length > prevIntentsRef.current.length) {
+            var prevIds_1 = new Set(prevIntentsRef.current.map(function (h) { return h.id; }));
+            var newHotspots = intents.filter(function (h) { return !prevIds_1.has(h.id); });
+            newHotspots.forEach(function (h) {
+                if (h.host_id !== myUserId) {
+                    sounds_1.playSound("broadcast");
+                    addToast("\uD83D\uDD25 New hotspot \"" + h.title + "\" created nearby!", "default");
+                    setNotifications(function (prev) { return __spreadArrays([
+                        {
+                            id: Math.random().toString(36).substring(7),
+                            text: "\uD83D\uDD25 New hotspot \"" + h.title + "\" created nearby",
+                            time: Date.now(),
+                            read: false
+                        }
+                    ], prev).slice(0, 5); });
+                }
+            });
+        }
+        prevIntentsRef.current = intents;
+    }, [intents, myUserId, addToast, setNotifications]);
     // Socket
     var socket = useSocket_1.useSocket({
         userId: myUserId,
@@ -420,8 +324,9 @@ function MapProvider(_a) {
         location: location,
         profile: profile,
         localBlocks: localBlocks,
-        isBroadcastingAudio: webRTC.isBroadcastingAudio,
+        isBroadcastingAudio: webRTC.isBroadcastingAudio && webRTC.isSpaceHost,
         onSync: function (msg) {
+            performance.mark("sync-start");
             var userMap = new Map();
             for (var _i = 0, _a = msg.users; _i < _a.length; _i++) {
                 var u = _a[_i];
@@ -430,6 +335,18 @@ function MapProvider(_a) {
             }
             setActiveUsers(Array.from(userMap.values()));
             setIntents(msg.hotspots || []);
+            requestAnimationFrame(function () {
+                if (typeof document !== 'undefined' && document.visibilityState !== 'visible')
+                    return;
+                performance.mark("sync-end");
+                performance.measure("norby_client_sync_render_duration", "sync-start", "sync-end");
+                var measures = performance.getEntriesByName("norby_client_sync_render_duration");
+                var last = measures[measures.length - 1];
+                // Ignore massive outliers and normal frame variation (flag only >100ms frame updates)
+                if (last && last.duration > 100 && last.duration < 1000) {
+                    // console.warn(`[norby metrics] Slow render detected: ${last.duration.toFixed(2)}ms for ${msg.users.length} users`);
+                }
+            });
         },
         onLocationUpdate: function (msg) {
             if (msg.data.user_id !== myUserId) {
@@ -437,23 +354,24 @@ function MapProvider(_a) {
                     var existingUser = prev.find(function (u) { return u.user_id === msg.data.user_id; });
                     var filtered = prev.filter(function (u) { return u.user_id !== msg.data.user_id; });
                     if (!existingUser) {
-                        setNotifications(function (prevNotifs) {
-                            return __spreadArrays([
-                                {
-                                    id: Math.random().toString(36).substring(7),
-                                    text: "@" + msg.data.username + " is now nearby",
-                                    time: Date.now(),
-                                    read: false
-                                }
-                            ], prevNotifs).slice(0, 5);
-                        });
+                        if (!msg.data.isGhostMode) {
+                            sounds_1.playSound("nearby");
+                            setNotifications(function (prevNotifs) {
+                                return __spreadArrays([
+                                    {
+                                        id: Math.random().toString(36).substring(7),
+                                        text: "@" + msg.data.username + " is now nearby",
+                                        time: Date.now(),
+                                        read: false
+                                    }
+                                ], prevNotifs).slice(0, 5);
+                            });
+                        }
                     }
                     else if (!existingUser.is_broadcasting_audio && msg.data.is_broadcasting_audio) {
-                        var isFriend = chatRequestsRef.current.some(function (r) {
-                            return r.status === "accepted" &&
-                                (r.sender_id === msg.data.user_id || r.target_id === msg.data.user_id);
-                        });
+                        var isFriend = true; // Everyone nearby who speaks triggers it
                         if (isFriend) {
+                            sounds_1.playSound("broadcast");
                             addToast("\uD83C\uDF99\uFE0F @" + msg.data.username + " is speaking nearby!", "default");
                             setNotifications(function (prevNotifs) {
                                 return __spreadArrays([
@@ -487,6 +405,7 @@ function MapProvider(_a) {
             setSelectedHotspot(msg.hotspot);
         },
         onJoinRequestReceived: function (msg) {
+            sounds_1.playSound("pop");
             setNotifications(function (prev) {
                 return __spreadArrays([
                     {
@@ -502,6 +421,21 @@ function MapProvider(_a) {
             }
         },
         onJoinResponse: function (msg) {
+            var isAccepted = msg.status === "accepted";
+            sounds_1.playSound(isAccepted ? "success" : "error");
+            addToast(isAccepted
+                ? "\u2705 Your request to join hotspot was accepted!"
+                : "\u274C Your request to join hotspot was declined.", "default");
+            setNotifications(function (prev) { return __spreadArrays([
+                {
+                    id: Math.random().toString(36).substring(7),
+                    text: isAccepted
+                        ? "\u2705 Request to join hotspot accepted"
+                        : "\u274C Request to join hotspot declined",
+                    time: Date.now(),
+                    read: false
+                }
+            ], prev).slice(0, 5); });
             if (selectedHotspotRef.current && selectedHotspotRef.current.id === msg.roomId) {
                 setSelectedHotspot(msg.hotspot);
             }
@@ -522,9 +456,11 @@ function MapProvider(_a) {
                         return prev;
                     return __assign(__assign({}, prev), { messages: __spreadArrays(rawMsgs, [msg.message]) });
                 });
+                sounds_1.playSound("click");
             }
         },
         onWaveReceived: function (msg) {
+            sounds_1.playSound("wave");
             addToast("\uD83D\uDC4B " + msg.sender_username + " waved at you!", "wave");
             setNotifications(function (prev) {
                 return __spreadArrays([
@@ -544,150 +480,136 @@ function MapProvider(_a) {
             setActiveUsers(function (prev) { return prev.filter(function (u) { return u.user_id !== msg.user_id; }); });
         },
         onChatRequestReceived: function (msg) {
-            addToast("\uD83D\uDCAC Chat request from @" + msg.request.sender_username + "!", "request");
+            sounds_1.playSound("pop");
+            eventBus_1.globalEventBus.emit("chat:chat_request", msg);
+        },
+        onChatRequestResponded: function (msg) { return eventBus_1.globalEventBus.emit("chat:chat_respond", msg); },
+        onNewDirectMessage: function (msg) {
+            sounds_1.playSound("click");
+            eventBus_1.globalEventBus.emit("chat:new_dm", msg);
+        },
+        onDMHistory: function (msg) { },
+        onTypingIndicator: function (msg) { return eventBus_1.globalEventBus.emit("chat:typing_indicator", msg); },
+        onChatsList: function (msg) { return eventBus_1.globalEventBus.emit("chat:chats_list", msg); },
+        onRtcOffer: webRTC.handleRtcOffer,
+        onRtcAnswer: webRTC.handleRtcAnswer,
+        onRtcIceCandidate: webRTC.handleRtcIceCandidate,
+        onCallRequest: function (msg) {
+            var _a;
+            if (webRTC.activeCallUserId || webRTC.isBroadcastingAudio || (profile === null || profile === void 0 ? void 0 : profile.isGhostMode)) {
+                (_a = socketMethodsRef.current) === null || _a === void 0 ? void 0 : _a.respondCallRequest(msg.caller_id, myUserId, "rejected");
+                return;
+            }
+            setIncomingCall({
+                caller_id: msg.caller_id,
+                caller_username: msg.caller_username,
+                caller_avatar: msg.caller_avatar
+            });
+            sounds_1.playSound("ring");
+            addToast("Incoming call from @" + msg.caller_username, "default");
             setNotifications(function (prev) { return __spreadArrays([
                 {
                     id: Math.random().toString(36).substring(7),
-                    text: "@" + msg.request.sender_username + " wants to connect with you",
+                    text: "\uD83D\uDCDE Incoming call from @" + msg.caller_username,
                     time: Date.now(),
                     read: false
                 }
             ], prev).slice(0, 5); });
-            setChatRequests(function (prev) {
-                var filtered = prev.filter(function (r) { return r.sender_id !== msg.request.sender_id || r.target_id !== msg.request.target_id; });
-                return __spreadArrays(filtered, [msg.request]);
-            });
         },
-        onChatRequestResponded: function (msg) {
-            var isAccepted = msg.request.status === "accepted";
-            var otherUser = msg.request.sender_id === myUserId ? msg.request.target_id : msg.request.sender_id;
-            var otherInfo = activeUsers.find(function (u) { return u.user_id === otherUser; });
-            var otherHandle = (otherInfo === null || otherInfo === void 0 ? void 0 : otherInfo.username) || "Someone";
+        onCallResponse: function (msg) {
+            var isAccepted = msg.status === "accepted";
+            var otherInfo = activeUsers.find(function (u) { return u.user_id === msg.responder_id; });
+            var otherHandle = (otherInfo === null || otherInfo === void 0 ? void 0 : otherInfo.username) || "user";
+            setNotifications(function (prev) { return __spreadArrays([
+                {
+                    id: Math.random().toString(36).substring(7),
+                    text: isAccepted
+                        ? "\uD83D\uDCDE Call with @" + otherHandle + " connected"
+                        : "\uD83D\uDCDE Call request to @" + otherHandle + " rejected",
+                    time: Date.now(),
+                    read: false
+                }
+            ], prev).slice(0, 5); });
             if (isAccepted) {
-                addToast("\u2705 Connected with @" + otherHandle + "! You can now chat.", "default");
+                sounds_1.playSound("connect");
+                setCallStatus("connected");
+                webRTC.startCall(msg.responder_id);
             }
             else {
-                addToast("\u274C Chat request to @" + otherHandle + " was declined.", "default");
+                sounds_1.playSound("error");
+                setOutgoingCallUserId(null);
+                setCallStatus(null);
+                addToast("Call rejected or user busy", "default");
             }
-            setChatRequests(function (prev) {
-                var filtered = prev.filter(function (r) { return r.sender_id !== msg.request.sender_id || r.target_id !== msg.request.target_id; });
-                return __spreadArrays(filtered, [msg.request]);
-            });
         },
-        onNewDirectMessage: function (msg) {
-            if (activeChatUserRef.current && (msg.message.sender_id === activeChatUserRef.current.user_id || msg.message.recipient_id === activeChatUserRef.current.user_id)) {
-                setChatMessages(function (prev) {
-                    if (prev.some(function (m) { return m.id === msg.message.id; }))
-                        return prev;
-                    var newMsgs = __spreadArrays(prev, [msg.message]);
-                    var convoId = [myUserId, activeChatUserRef.current.user_id].sort().join(":");
-                    if (typeof window !== "undefined") {
-                        try {
-                            var oneHourAgo_2 = Date.now() - 60 * 60 * 1000;
-                            var filtered = newMsgs.filter(function (m) { return m.timestamp > oneHourAgo_2; });
-                            localStorage.setItem("chat_msgs_" + convoId, JSON.stringify(filtered));
-                        }
-                        catch (e) {
-                            console.warn("[noirme] Failed to save chat to localStorage");
-                        }
-                    }
-                    return newMsgs;
-                });
-            }
-            else {
-                if (msg.message.sender_id !== myUserId) {
-                    addToast("\u2709\uFE0F New message from @" + msg.message.sender_username + ": \"" + msg.message.text.substring(0, 20) + (msg.message.text.length > 20 ? "..." : "") + "\"", "default");
-                    setUnreadMessages(function (prev) {
-                        var _a;
-                        return (__assign(__assign({}, prev), (_a = {}, _a[msg.message.sender_id] = (prev[msg.message.sender_id] || 0) + 1, _a)));
-                    });
+        onCallEnd: function (msg) {
+            setNotifications(function (prev) { return __spreadArrays([
+                {
+                    id: Math.random().toString(36).substring(7),
+                    text: "\uD83D\uDCDE Call ended",
+                    time: Date.now(),
+                    read: false
                 }
-                if (typeof window !== "undefined") {
-                    try {
-                        var otherUserId = msg.message.sender_id === myUserId ? msg.message.recipient_id : msg.message.sender_id;
-                        var convoId = [myUserId, otherUserId].sort().join(":");
-                        var list = [];
-                        var stored = localStorage.getItem("chat_msgs_" + convoId);
-                        if (stored) {
-                            list = JSON.parse(stored);
-                        }
-                        if (!list.some(function (m) { return m.id === msg.message.id; })) {
-                            list.push(msg.message);
-                            var oneHourAgo_3 = Date.now() - 60 * 60 * 1000;
-                            var filtered = list.filter(function (m) { return m.timestamp > oneHourAgo_3; });
-                            localStorage.setItem("chat_msgs_" + convoId, JSON.stringify(filtered));
-                        }
-                    }
-                    catch (e) {
-                        console.warn("[noirme] Failed to cache message");
-                    }
-                }
-            }
-        },
-        onDMHistory: function (msg) {
-            // Server history no longer used - all messages stored locally
-        },
-        onTypingIndicator: function (msg) {
-            setPeerTyping(function (prev) {
-                var _a;
-                return (__assign(__assign({}, prev), (_a = {}, _a[msg.sender_id] = msg.is_typing, _a)));
-            });
-        },
-        onChatsList: function (msg) {
-            setChatRequests(msg.requests || []);
-        },
-        onRtcOffer: webRTC.handleRtcOffer,
-        onRtcAnswer: webRTC.handleRtcAnswer,
-        onRtcIceCandidate: webRTC.handleRtcIceCandidate
+            ], prev).slice(0, 5); });
+            setIncomingCall(null);
+            setOutgoingCallUserId(null);
+            setCallStatus(null);
+            webRTC.endCall(msg.sender_id || msg.target_user_id || msg.caller_id);
+            addToast("Call ended", "default");
+        }
     });
     react_1.useEffect(function () {
         socketMethodsRef.current = socket;
     }, [socket]);
     // Action methods
-    var handleWave = function () {
+    var handleWave = react_1.useCallback(function () {
         if (!selectedUser)
             return;
         setHasWaved(true);
+        sounds_1.playSound("wave");
         addToast("You waved at " + selectedUser.username);
         socket.sendWave(selectedUser.user_id);
-    };
-    var handleBlock = function (userId) { return __awaiter(_this, void 0, void 0, function () {
-        var newBlocks;
+    }, [selectedUser, addToast, socket]);
+    var handleBlock = react_1.useCallback(function (userId) { return __awaiter(_this, void 0, void 0, function () {
         return __generator(this, function (_a) {
             switch (_a.label) {
                 case 0: return [4 /*yield*/, blockUser(userId)];
                 case 1:
                     _a.sent();
-                    newBlocks = __spreadArrays(localBlocks, [userId]);
-                    setLocalBlocks(newBlocks);
-                    localStorage.setItem("noirme_local_blocks", JSON.stringify(newBlocks));
+                    setLocalBlocks(function (prev) {
+                        var newBlocks = __spreadArrays(prev, [userId]);
+                        localStorage.setItem("norby_local_blocks", JSON.stringify(newBlocks));
+                        return newBlocks;
+                    });
                     setSelectedUser(null);
                     return [2 /*return*/];
             }
         });
-    }); };
-    var postIntent = function (osmPlace) {
+    }); }, [blockUser]);
+    var postIntent = react_1.useCallback(function (osmPlace) {
         if (!intentText.trim())
             return;
+        sounds_1.playSound("success");
         socket.createHotspot(intentText, customHotspotRange, osmPlace);
         setIntentText("");
         setShowIntentModal(false);
-    };
-    var requestJoin = function (roomId) {
-        var id = typeof roomId === "string" ? roomId : selectedHotspot === null || selectedHotspot === void 0 ? void 0 : selectedHotspot.id;
+    }, [intentText, customHotspotRange, socket]);
+    var requestJoin = react_1.useCallback(function (roomId) {
+        var _a;
+        var id = typeof roomId === "string" ? roomId : (_a = selectedHotspotRef.current) === null || _a === void 0 ? void 0 : _a.id;
         if (!id)
             return;
         socket.requestJoin(id);
-    };
-    var respondRequest = function (guestId, status) {
-        if (!selectedHotspot)
+    }, [socket]);
+    var respondRequest = react_1.useCallback(function (guestId, status) {
+        if (!selectedHotspotRef.current)
             return;
-        socket.respondRequest(selectedHotspot.id, guestId, status);
-    };
-    var sendMessage = function (text) {
-        if (!selectedHotspot)
+        socket.respondRequest(selectedHotspotRef.current.id, guestId, status);
+    }, [socket]);
+    var sendMessage = react_1.useCallback(function (text) {
+        if (!selectedHotspotRef.current)
             return;
-        socket.sendMessage(selectedHotspot.id, text, function (optimisticMsg) {
+        socket.sendMessage(selectedHotspotRef.current.id, text, function (optimisticMsg) {
             setSelectedHotspot(function (prev) {
                 if (!prev)
                     return null;
@@ -695,87 +617,137 @@ function MapProvider(_a) {
             });
             addToast("Offline: Message queued.", "default");
         });
-    };
-    var leaveHotspot = function () {
-        if (!selectedHotspot)
+    }, [socket, addToast]);
+    var leaveHotspot = react_1.useCallback(function (roomId) {
+        var _a, _b;
+        var id = roomId || ((_a = selectedHotspotRef.current) === null || _a === void 0 ? void 0 : _a.id);
+        if (!id)
             return;
-        socket.leaveHotspot(selectedHotspot.id);
-        setSelectedHotspot(null);
-    };
-    // Deprecated - history loaded directly in main effect from localStorage
-    var sendChatRequest = function (targetUserId) {
-        socket.sendChatRequest(targetUserId);
-    };
-    var respondChatRequest = function (senderId, status) {
-        socket.respondChatRequest(senderId, status);
-    };
-    var sendDirectMessage = function (text) {
-        if (!activeChatUser || !myUserId || myUserId === "anon")
+        socket.leaveHotspot(id);
+        if (((_b = selectedHotspotRef.current) === null || _b === void 0 ? void 0 : _b.id) === id) {
+            setSelectedHotspot(null);
+        }
+    }, [socket]);
+    var initiateCall = react_1.useCallback(function (targetUserId) {
+        if (webRTC.isBroadcastingAudio) {
+            addToast("You cannot make a 1-to-1 call while in a Space.", "default");
             return;
-        var optimisticMsg = {
-            id: "local_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6),
-            sender_id: myUserId,
-            sender_username: handle || myUserId,
-            sender_avatar: myAvatarUrl,
-            recipient_id: activeChatUser.user_id,
-            text: text,
-            timestamp: Date.now()
-        };
-        setChatMessages(function (prev) {
-            var next = __spreadArrays(prev, [optimisticMsg]);
-            var convoId = [myUserId, activeChatUser.user_id].sort().join(":");
-            if (typeof window !== "undefined") {
-                try {
-                    var oneHourAgo_4 = Date.now() - 60 * 60 * 1000;
-                    var filtered = next.filter(function (m) { return m.timestamp > oneHourAgo_4; });
-                    localStorage.setItem("chat_msgs_" + convoId, JSON.stringify(filtered));
-                }
-                catch (e) {
-                    console.warn("[noirme] Failed to save chat to localStorage");
-                }
+        }
+        setCallStatus("ringing");
+        setOutgoingCallUserId(targetUserId);
+        socket.sendCallRequest(targetUserId);
+    }, [socket, webRTC, addToast]);
+    var acceptCall = react_1.useCallback(function () {
+        if (!incomingCall)
+            return;
+        setCallStatus("connected");
+        setOutgoingCallUserId(incomingCall.caller_id);
+        socket.respondCallRequest(incomingCall.caller_id, myUserId, "accepted");
+        setNotifications(function (prev) { return __spreadArrays([
+            {
+                id: Math.random().toString(36).substring(7),
+                text: "\uD83D\uDCDE Call with @" + incomingCall.caller_username + " connected",
+                time: Date.now(),
+                read: false
             }
-            return next;
-        });
-        socket.sendDirectMessage(activeChatUser.user_id, text);
-    };
-    var sendTypingState = function (isTyping) {
-        if (!activeChatUser)
+        ], prev).slice(0, 5); });
+        setIncomingCall(null);
+    }, [incomingCall, socket, myUserId]);
+    var rejectCall = react_1.useCallback(function () {
+        if (!incomingCall)
             return;
-        socket.sendTypingState(activeChatUser.user_id, isTyping);
-    };
-    var requestDMHistory = function (targetUserId) {
-        socket.requestDMHistory(targetUserId);
-    };
-    var refreshRadar = function () {
+        socket.respondCallRequest(incomingCall.caller_id, myUserId, "rejected");
+        setIncomingCall(null);
+        setOutgoingCallUserId(null);
+        setCallStatus(null);
+    }, [incomingCall, socket, myUserId]);
+    var hangUp = react_1.useCallback(function () {
+        var target = webRTC.activeCallUserId || outgoingCallUserId || (incomingCall === null || incomingCall === void 0 ? void 0 : incomingCall.caller_id);
+        if (target) {
+            socket.sendCallEnd(target);
+            webRTC.endCall(target);
+        }
+        setIncomingCall(null);
+        setOutgoingCallUserId(null);
+        setCallStatus(null);
+    }, [socket, webRTC, outgoingCallUserId, incomingCall]);
+    // Call Timeout Refs to avoid dependency-triggered resets.
+    // Updated synchronously in render body to guarantee the latest closure is always available.
+    var hangUpRef = react_1.useRef(hangUp);
+    var rejectCallRef = react_1.useRef(rejectCall);
+    hangUpRef.current = hangUp;
+    rejectCallRef.current = rejectCall;
+    // Track outgoing/incoming calls in refs for logging purposes
+    var outgoingCallUserIdRef = react_1.useRef(outgoingCallUserId);
+    outgoingCallUserIdRef.current = outgoingCallUserId;
+    var incomingCallRef = react_1.useRef(incomingCall);
+    incomingCallRef.current = incomingCall;
+    // Log state updates to help diagnose any unexpected state resets
+    react_1.useEffect(function () {
+        console.log("[MapProvider Call State] Updated - callStatus:", callStatus, "incomingCall:", incomingCall, "outgoingCallUserId:", outgoingCallUserId);
+    }, [callStatus, incomingCall, outgoingCallUserId]);
+    // Outgoing call timeout (unanswered calls cut after 30 seconds)
+    react_1.useEffect(function () {
+        var timeout;
+        if (callStatus === "ringing") {
+            var targetId = outgoingCallUserIdRef.current;
+            console.log("[call_timeout] Setting outgoing call timeout for 30 seconds targeting: " + targetId);
+            timeout = setTimeout(function () {
+                console.log("[call_timeout] Outgoing call timeout fired! Closing unanswered call to target: " + outgoingCallUserIdRef.current);
+                addToast("Call unanswered", "default");
+                hangUpRef.current();
+            }, 30000);
+        }
+        return function () {
+            if (timeout) {
+                console.log("[call_timeout] Clearing outgoing call timeout");
+                clearTimeout(timeout);
+            }
+        };
+    }, [callStatus, addToast]);
+    // Incoming call timeout (missed calls cut after 30 seconds)
+    react_1.useEffect(function () {
+        var timeout;
+        if (incomingCall) {
+            var callerId = incomingCall.caller_id;
+            console.log("[call_timeout] Setting incoming call timeout for 30 seconds from caller: " + callerId);
+            timeout = setTimeout(function () {
+                var _a;
+                console.log("[call_timeout] Incoming call timeout fired! Rejecting missed call from caller: " + ((_a = incomingCallRef.current) === null || _a === void 0 ? void 0 : _a.caller_id));
+                addToast("Call missed", "default");
+                rejectCallRef.current();
+            }, 30000);
+        }
+        return function () {
+            if (timeout) {
+                console.log("[call_timeout] Clearing incoming call timeout");
+                clearTimeout(timeout);
+            }
+        };
+    }, [incomingCall === null || incomingCall === void 0 ? void 0 : incomingCall.caller_id, addToast]);
+    // Deprecated - history loaded directly in main effect from localStorage
+    // Chat action methods have been moved to ChatProvider
+    var refreshRadar = react_1.useCallback(function () {
         setFollowUser(true);
         setRecenterTrigger(function (t) { return t + 1; });
+        socket.requestSync();
         refreshLocation().then(function () {
             socket.requestSync();
         });
-    };
-    var FILTER_KEYWORDS = {
-        cafe: ["coffee", "chai", "boba", "tea", "ramen", "food", "eat", "matcha", "latte", "café", "cafe", "brunch", "lunch", "dinner", "cook", "☕", "🍵", "🧋", "🍜", "🍕"],
-        dating: ["date", "dating", "love", "crush", "vibe", "connection", "hangout", "chill", "flirt", "coffee date", "sunset", "romantic", "💕", "✨", "🔥"],
-        gaming: ["game", "gaming", "chess", "board", "cards", "esport", "valorant", "minecraft", "ps5", "xbox", "pubg", "bgmi", "cod", "fortnite", "dice", "ludo", "🎮", "🎲", "🎯"],
-        movies: ["movie", "film", "cinema", "netflix", "anime", "watch", "series", "binge", "popcorn", "marvel", "bollywood", "horror", "comedy", "thriller", "🍿", "🎬", "🎌"],
-        study: ["study", "code", "coding", "book", "exam", "learn", "grind", "library", "homework", "project", "hackathon", "dsa", "leetcode", "🎒", "📚", "💻"],
-        music: ["guitar", "jam", "music", "vinyl", "sing", "beat", "lofi", "karaoke", "concert", "piano", "rap", "podcast", "spotify", "🎸", "🎧", "🎤"],
-        sports: ["gym", "run", "walk", "bike", "swim", "sport", "workout", "yoga", "cricket", "football", "basketball", "badminton", "trek", "hike", "🛹", "🏋️", "🚴", "🏃", "🧘"],
-        chill: ["chill", "vibe", "hangout", "drive", "explore", "roam", "wander", "sunset", "night", "midnight", "smoke", "terrace", "rooftop", "🎨", "⚡", "📷", "🌿", "🍳", "🚗", "🌙"]
-    };
+    }, [refreshLocation, socket]);
     function matchesFilter(intent, key) {
-        if (key === "all")
-            return true;
-        var keywords = FILTER_KEYWORDS[key];
-        if (!keywords)
-            return true;
-        var t = (intent.title || "").toLowerCase();
-        return keywords.some(function (k) { return t.includes(k); });
+        var searchableFields = __spreadArrays([
+            intent.title,
+            intent.description,
+            intent.category,
+            intent.activity
+        ], (Array.isArray(intent.host_tags) ? intent.host_tags : []), (Array.isArray(intent.tags) ? intent.tags : []));
+        return mapFilters_1.matchesMapFilterText(searchableFields.filter(Boolean).join(" "), key);
     }
     function matchesUserFilter(u, key) {
         if (key === "all")
             return true;
-        var keywords = FILTER_KEYWORDS[key];
+        var keywords = mapFilters_1.MAP_FILTER_KEYWORDS[key];
         if (!keywords)
             return true;
         // Match by vibe emoji
@@ -785,9 +757,9 @@ function MapProvider(_a) {
         // Match by bio or tags
         var bio = (u.bio || "").toLowerCase();
         var tags = u.selectedTags || [];
-        if (keywords.some(function (k) { return bio.includes(k); }))
+        if (mapFilters_1.matchesMapFilterText(bio, key))
             return true;
-        if (tags.some(function (tag) { return keywords.some(function (k) { return tag.toLowerCase().includes(k); }); }))
+        if (tags.some(function (tag) { return mapFilters_1.matchesMapFilterText(tag, key); }))
             return true;
         return false;
     }
@@ -811,7 +783,7 @@ function MapProvider(_a) {
         return intents.filter(function (h) {
             var isBlocked = blockedIds.includes(h.host_id);
             var dist = useGeolocation_1.getDistanceKm(location.lat, location.lng, h.lat, h.lng);
-            var isWithinRange = dist <= radarRadius && dist <= (h.hotspotRange || 15);
+            var isWithinRange = dist <= radarRadius;
             var isNotExpired = h.expires_at > Date.now();
             var isMatchesFilter = matchesFilter(h, selectedFilter);
             return !isBlocked && isWithinRange && isNotExpired && isMatchesFilter;
@@ -870,7 +842,15 @@ function MapProvider(_a) {
         respondRequest: respondRequest,
         sendMessage: sendMessage,
         leaveHotspot: leaveHotspot,
+        incomingCall: incomingCall,
+        callStatus: callStatus,
+        activeCallUserId: webRTC.activeCallUserId,
+        initiateCall: initiateCall,
+        acceptCall: acceptCall,
+        rejectCall: rejectCall,
+        hangUp: hangUp,
         isBroadcastingAudio: webRTC.isBroadcastingAudio,
+        isSpaceHost: webRTC.isSpaceHost,
         startBroadcast: webRTC.startBroadcast,
         stopBroadcast: webRTC.stopBroadcast,
         startListening: webRTC.startListening,
@@ -878,6 +858,24 @@ function MapProvider(_a) {
         incomingStreams: webRTC.incomingStreams,
         isSpeakerMuted: isSpeakerMuted,
         setIsSpeakerMuted: setIsSpeakerMuted,
+        speakRequests: webRTC.speakRequests,
+        activeSpeakers: webRTC.activeSpeakers,
+        activeListeners: webRTC.activeListeners,
+        mySpeakStatus: webRTC.mySpeakStatus,
+        isMutedByHost: webRTC.isMutedByHost,
+        isLocalMicMuted: webRTC.isLocalMicMuted,
+        requestToSpeak: webRTC.requestToSpeak,
+        cancelSpeakRequest: webRTC.cancelSpeakRequest,
+        approveSpeaker: webRTC.approveSpeaker,
+        declineSpeaker: webRTC.declineSpeaker,
+        muteSpeaker: webRTC.muteSpeaker,
+        unmuteSpeaker: webRTC.unmuteSpeaker,
+        removeSpeaker: webRTC.removeSpeaker,
+        toggleLocalMic: webRTC.toggleLocalMic,
+        leaveSpace: webRTC.leaveSpace,
+        showSpaceDrawer: showSpaceDrawer,
+        setShowSpaceDrawer: setShowSpaceDrawer,
+        profile: profile,
         filteredUsers: filteredUsers,
         filteredHotspots: filteredHotspots,
         activeUsers: activeUsers,
@@ -920,8 +918,20 @@ function MapProvider(_a) {
         showNotifDropdown,
         activeWaves,
         webRTC.isBroadcastingAudio,
+        webRTC.activeCallUserId,
+        incomingCall,
+        callStatus,
+        webRTC.isSpaceHost,
         webRTC.incomingStreams,
         isSpeakerMuted,
+        webRTC.speakRequests,
+        webRTC.activeSpeakers,
+        webRTC.activeListeners,
+        webRTC.mySpeakStatus,
+        webRTC.isMutedByHost,
+        webRTC.isLocalMicMuted,
+        showSpaceDrawer,
+        profile,
         filteredUsers,
         filteredHotspots,
         activeUsers,
@@ -929,27 +939,53 @@ function MapProvider(_a) {
         activeRouteMode,
         routingTarget,
         isLoadingRoute,
+        refreshRadar,
+        setZoom,
+        setFollowUser,
+        setIsInteracting,
+        setSelectedFilter,
+        setSelectedUser,
+        setSelectedHotspot,
+        setShowIntentModal,
+        setIntentText,
+        setCustomHotspotRange,
+        setHasWaved,
+        setConfirmBlock,
+        addToast,
+        setNotifications,
+        setShowNotifDropdown,
+        handleWave,
+        handleBlock,
+        postIntent,
+        requestJoin,
+        respondRequest,
+        sendMessage,
+        leaveHotspot,
+        initiateCall,
+        acceptCall,
+        rejectCall,
+        hangUp,
+        webRTC.startBroadcast,
+        webRTC.stopBroadcast,
+        webRTC.startListening,
+        webRTC.stopListening,
+        setIsSpeakerMuted,
+        webRTC.requestToSpeak,
+        webRTC.cancelSpeakRequest,
+        webRTC.approveSpeaker,
+        webRTC.declineSpeaker,
+        webRTC.muteSpeaker,
+        webRTC.unmuteSpeaker,
+        webRTC.removeSpeaker,
+        webRTC.toggleLocalMic,
+        webRTC.leaveSpace,
+        setShowSpaceDrawer,
+        clearActiveRoute,
+        setActiveRouteMode,
+        setRoutingTarget,
     ]);
-    var socialValue = react_1.useMemo(function () { return ({
-        chatRequests: chatRequests,
-        friends: friends,
-        sendChatRequest: sendChatRequest,
-        respondChatRequest: respondChatRequest
-    }); }, [chatRequests, friends]);
-    var dmValue = react_1.useMemo(function () { return ({
-        chatMessages: chatMessages,
-        peerTyping: peerTyping,
-        activeChatUser: activeChatUser,
-        setActiveChatUser: setActiveChatUser,
-        sendDirectMessage: sendDirectMessage,
-        sendTypingState: sendTypingState,
-        requestDMHistory: requestDMHistory,
-        isLoadingHistory: isLoadingHistory,
-        unreadMessagesCount: unreadMessagesCount
-    }); }, [chatMessages, peerTyping, activeChatUser, isLoadingHistory, unreadMessagesCount]);
     return (React.createElement(MapContext.Provider, { value: mapValue },
-        React.createElement(SocialContext.Provider, { value: socialValue },
-            React.createElement(DMContext.Provider, { value: dmValue }, children))));
+        React.createElement(ChatProvider_1.ChatProvider, { socket: socket, myUserId: myUserId, handle: handle, myAvatarUrl: myAvatarUrl, addToast: addToast, setNotifications: setNotifications, activeUsers: activeUsers, isSignedIn: isSignedIn, location: location, filteredHotspots: filteredHotspots }, children)));
 }
 exports.MapProvider = MapProvider;
 function useMapContext() {
@@ -960,19 +996,3 @@ function useMapContext() {
     return context;
 }
 exports.useMapContext = useMapContext;
-function useSocialContext() {
-    var context = react_1.useContext(SocialContext);
-    if (!context) {
-        throw new Error("useSocialContext must be used within a MapProvider");
-    }
-    return context;
-}
-exports.useSocialContext = useSocialContext;
-function useDMContext() {
-    var context = react_1.useContext(DMContext);
-    if (!context) {
-        throw new Error("useDMContext must be used within a MapProvider");
-    }
-    return context;
-}
-exports.useDMContext = useDMContext;

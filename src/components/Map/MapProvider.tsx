@@ -8,6 +8,7 @@ import { useWebRTC } from "@/hooks/useWebRTC";
 import { fetchOSRMRoute, RouteData, TransportMode } from "@/lib/routing";
 import { globalEventBus } from "@/lib/eventBus";
 import { playSound } from "@/lib/sounds";
+import { MAP_FILTER_KEYWORDS, matchesMapFilterText } from "@/lib/mapFilters";
 import { ChatProvider, DirectMessage } from "./ChatProvider";
 export { SocialContext, DMContext, useSocialContext, useDMContext, type SocialContextType, type DMContextType } from "./ChatProvider";
 
@@ -867,38 +868,21 @@ export function MapProvider({ children }: { children: React.ReactNode }) {
 
 
 
-  const FILTER_KEYWORDS: Record<string, string[]> = {
-    cafe: ["coffee", "chai", "boba", "tea", "ramen", "food", "eat", "matcha", "latte", "café", "cafe", "brunch", "lunch", "dinner", "cook", "☕", "🍵", "🧋", "🍜", "🍕"],
-    dating: ["date", "dating", "love", "crush", "vibe", "connection", "hangout", "chill", "flirt", "coffee date", "sunset", "romantic", "💕", "✨", "🔥"],
-    gaming: ["game", "gaming", "chess", "board", "cards", "esport", "valorant", "minecraft", "ps5", "xbox", "pubg", "bgmi", "cod", "fortnite", "dice", "ludo", "🎮", "🎲", "🎯"],
-    movies: ["movie", "film", "cinema", "netflix", "anime", "watch", "series", "binge", "popcorn", "marvel", "bollywood", "horror", "comedy", "thriller", "🍿", "🎬", "🎌"],
-    study: ["study", "code", "coding", "book", "exam", "learn", "grind", "library", "homework", "project", "hackathon", "dsa", "leetcode", "🎒", "📚", "💻"],
-    music: ["guitar", "jam", "music", "vinyl", "sing", "beat", "lofi", "karaoke", "concert", "piano", "rap", "podcast", "spotify", "🎸", "🎧", "🎤"],
-    sports: ["gym", "run", "walk", "bike", "swim", "sport", "workout", "yoga", "cricket", "football", "basketball", "badminton", "trek", "hike", "🛹", "🏋️", "🚴", "🏃", "🧘"],
-    chill: ["chill", "vibe", "hangout", "drive", "explore", "roam", "wander", "sunset", "night", "midnight", "smoke", "terrace", "rooftop", "🎨", "⚡", "📷", "🌿", "🍳", "🚗", "🌙"],
-  };
-
-  function matchesWord(text: string, keyword: string): boolean {
-    const isAlphaNum = /^[a-zA-Z0-9]+$/.test(keyword);
-    if (isAlphaNum) {
-      const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      const regex = new RegExp(`\\b${escaped}\\b`, 'i');
-      return regex.test(text);
-    }
-    return text.includes(keyword);
-  }
-
   function matchesFilter(intent: any, key: string): boolean {
-    if (key === "all") return true;
-    const keywords = FILTER_KEYWORDS[key];
-    if (!keywords) return true;
-    const t = (intent.title || "").toLowerCase();
-    return keywords.some((k) => matchesWord(t, k));
+    const searchableFields = [
+      intent.title,
+      intent.description,
+      intent.category,
+      intent.activity,
+      ...(Array.isArray(intent.host_tags) ? intent.host_tags : []),
+      ...(Array.isArray(intent.tags) ? intent.tags : []),
+    ];
+    return matchesMapFilterText(searchableFields.filter(Boolean).join(" "), key);
   }
 
   function matchesUserFilter(u: any, key: string): boolean {
     if (key === "all") return true;
-    const keywords = FILTER_KEYWORDS[key];
+    const keywords = MAP_FILTER_KEYWORDS[key];
     if (!keywords) return true;
 
     // Match by vibe emoji
@@ -908,8 +892,8 @@ export function MapProvider({ children }: { children: React.ReactNode }) {
     // Match by bio or tags
     const bio = (u.bio || "").toLowerCase();
     const tags = u.selectedTags || [];
-    if (keywords.some((k) => matchesWord(bio, k))) return true;
-    if (tags.some((tag: string) => keywords.some((k) => matchesWord(tag.toLowerCase(), k)))) return true;
+    if (matchesMapFilterText(bio, key)) return true;
+    if (tags.some((tag: string) => matchesMapFilterText(tag, key))) return true;
 
     return false;
   }
