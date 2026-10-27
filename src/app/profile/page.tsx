@@ -1,18 +1,30 @@
 "use client";
 
 import { useAuth, getAvatarUrl } from "@/hooks/useAuth";
-import { LogIn, LogOut, Loader2, Shield, X, Sparkles, Shuffle, Check, Upload, ChevronRight, Volume2, HelpCircle, Ghost } from "lucide-react";
+import { LogIn, LogOut, Loader2, Shield, X, Sparkles, Shuffle, Check, Upload, ChevronRight, Volume2, HelpCircle, Ghost, Code2, Camera, BriefcaseBusiness, AtSign } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 
-const INTEREST_TAGS = [
-  "Study Grind 📚", "Specialty Coffee ☕", "Boba Runs 🧋", "Thrifting 🪵",
-  "Skateboarding 🛹", "Alt Vinyls 🎵", "Heavy Lifting 🏋️", "Matcha Latte 🍵",
-  "Visual Arts 🎨", "Midnight Ramen 🍜", "Lo-fi Beats 🎧", "Retro Gaming 👾",
-  "Hackathon 💻", "Cycling 🚴", "Photography 📷", "Open Mic 🎤",
-  "Dating 💕", "Board Games 🎲", "Movie Night 🍿", "Cooking 🍳",
-  "Anime 🎌", "Night Drive 🌙", "Karaoke 🎤", "Road Trips 🚗",
+const INTEREST_GROUPS = {
+  "Blockchain & Web3": ["Ethereum", "DeFi", "ZK", "Solidity", "Smart Contracts", "Layer 2", "Account Abstraction", "Wallets", "Infrastructure", "Security", "Privacy", "DAOs", "NFTs", "Web3 Gaming"],
+  "AI & Engineering": ["AI Agents", "Machine Learning", "Full Stack", "Frontend", "Backend", "DevOps", "Open Source", "Developer Tools", "Robotics", "System Design"],
+  "Building & Startups": ["Hackathons", "Side Projects", "Startups", "Product Design", "UI/UX", "Research", "Open Source Contributions", "Community Building"],
+  "Social & Community": ["Founders", "Mentoring", "Hiring", "Coffee Chats", "Coworking", "Networking", "Food", "Exploring Mumbai"],
+} as const;
+
+const INTEREST_TAGS: string[] = Object.values(INTEREST_GROUPS).flat();
+
+const OPEN_TO_OPTIONS = [
+  "Hackathon Teammates",
+  "Project Collaborators",
+  "Cofounders",
+  "Mentors",
+  "Technical Discussions",
+  "Open Source Contributions",
+  "Coffee Chats",
+  "Coworking",
+  "Networking",
 ];
 
 const EMOJI_OPTIONS = [
@@ -72,6 +84,8 @@ export default function ProfilePage() {
   const [gender, setGender] = useState<"Male" | "Female" | "Non-binary" | "Prefer not to say" | "">("");
   const [age, setAge] = useState<number | "">("");
   const [bio, setBio] = useState("");
+  const [projectDescription, setProjectDescription] = useState("");
+  const [openTo, setOpenTo] = useState<string[]>([]);
   const [vibeEmoji, setVibeEmoji] = useState("☕");
   const [radarRange, setRadarRange] = useState(15);
   const [hotspotRange, setHotspotRange] = useState(15);
@@ -236,6 +250,8 @@ export default function ProfilePage() {
     if (profile) {
       setHandle(profile.handle);
       setBio(profile.bio);
+      setProjectDescription(profile.projectDescription || "");
+      setOpenTo(profile.openTo || []);
       setVibeEmoji(profile.vibeEmoji);
       setRadarRange(profile.radarRange);
       setHotspotRange(profile.hotspotRange || 15);
@@ -262,7 +278,7 @@ export default function ProfilePage() {
     if (age === "" || isNaN(Number(age)) || Number(age) <= 0) { setError("Please enter a valid age."); return; }
     setIsSaving(true);
     try {
-      await saveProfile({ handle, bio, vibeEmoji, radarRange, hotspotRange, bannerGradient: gradientIdx, selectedTags, maskLocation, isGhostMode, avatar_url: avatarUrl, gender, age: Number(age) });
+      await saveProfile({ handle, bio, projectDescription, openTo, vibeEmoji, radarRange, hotspotRange, bannerGradient: gradientIdx, selectedTags, maskLocation, isGhostMode, avatar_url: avatarUrl, gender, age: Number(age) });
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 2500);
     } catch (e) {
@@ -277,6 +293,10 @@ export default function ProfilePage() {
     setSelectedTags(prev =>
       prev.includes(tag) ? prev.filter(t => t !== tag) : prev.length < 6 ? [...prev, tag] : prev
     );
+
+  const toggleOpenTo = (option: string) => {
+    setOpenTo(prev => prev.includes(option) ? prev.filter(value => value !== option) : [...prev, option]);
+  };
 
   // ─ Loading
   if (isLoading) {
@@ -416,6 +436,14 @@ export default function ProfilePage() {
           <div className="w-full flex flex-col items-center">
             <h2 className="text-lg font-bold text-zinc-900 truncate max-w-[200px]">{handle || user?.username}</h2>
             <p className="text-xs text-zinc-400 mt-0.5">@{user?.username}</p>
+            {(projectDescription || selectedTags.length > 0) && (
+              <div className="mt-3 flex max-w-sm flex-wrap justify-center gap-1.5">
+                {selectedTags.slice(0, 4).map(tag => (
+                  <span key={tag} className="rounded-full bg-zinc-100 px-2.5 py-1 text-[9px] font-bold text-zinc-600">{tag}</span>
+                ))}
+                {projectDescription && <span className="w-full truncate text-[10px] font-medium text-zinc-500">{projectDescription}</span>}
+              </div>
+            )}
             <div className="flex gap-2 mt-3">
               <button
                 onClick={() => setShowAvatarPicker(true)}
@@ -472,8 +500,8 @@ export default function ProfilePage() {
                     type="button"
                     onClick={() => setGender(option)}
                     className={`px-3 py-2 rounded-xl border text-[10px] font-semibold transition-all active:scale-95 ${gender === option
-                        ? "bg-zinc-900 border-zinc-900 text-white shadow-sm"
-                        : "bg-zinc-50 border-zinc-200 text-zinc-500 hover:border-zinc-300"
+                      ? "bg-zinc-900 border-zinc-900 text-white shadow-sm"
+                      : "bg-zinc-50 border-zinc-200 text-zinc-500 hover:border-zinc-300"
                       }`}
                   >
                     {option}
@@ -490,11 +518,26 @@ export default function ProfilePage() {
               <textarea
                 value={bio}
                 onChange={e => setBio(e.target.value.slice(0, 150))}
-                placeholder="Late night ramen, vinyl records, and strong espresso."
+                placeholder="Developer building cool things. Always up for collaborating over coffee."
                 rows={2}
                 className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-3.5 py-2.5 text-sm text-zinc-900 placeholder-zinc-300 focus:outline-none focus:border-zinc-400 transition-colors resize-none leading-relaxed"
               />
               <span className="absolute bottom-2 right-3 text-[9px] text-zinc-400 font-semibold">{bio.length}/150</span>
+            </div>
+          </div>
+
+          {/* Project */}
+          <div className="px-4 py-3">
+            <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block mb-1.5">What are you building?</label>
+            <div className="relative">
+              <textarea
+                value={projectDescription}
+                onChange={e => setProjectDescription(e.target.value.slice(0, 200))}
+                placeholder="Tell the community what you're working on..."
+                rows={2}
+                className="w-full resize-none rounded-xl border border-zinc-200 bg-zinc-50 px-3.5 py-2.5 text-sm leading-relaxed text-zinc-900 placeholder-zinc-300 transition-colors focus:border-zinc-400 focus:outline-none"
+              />
+              <span className="absolute bottom-2 right-3 text-[9px] font-semibold text-zinc-400">{projectDescription.length}/200</span>
             </div>
           </div>
         </div>
@@ -507,22 +550,29 @@ export default function ProfilePage() {
           <span className="text-[10px] font-bold text-zinc-400">{selectedTags.length}/6</span>
         </div>
         <div className="px-4 py-3">
-          <div className="flex flex-wrap gap-1.5">
-            {INTEREST_TAGS.map(tag => {
-              const active = selectedTags.includes(tag);
-              return (
-                <button
-                  key={tag}
-                  onClick={() => toggleTag(tag)}
-                  className={`px-2.5 py-1.5 rounded-full border text-[10px] font-semibold transition-all active:scale-95 ${active
-                      ? "bg-zinc-900 border-zinc-900 text-white"
-                      : "bg-white border-zinc-200 text-zinc-500 hover:border-zinc-400"
-                    }`}
-                >
-                  {tag}
-                </button>
-              );
-            })}
+          <div className="space-y-3">
+            {Object.entries(INTEREST_GROUPS).map(([group, tags]) => (
+              <div key={group} className="space-y-1.5">
+                <p className="text-[9px] font-bold uppercase tracking-wider text-zinc-400">{group}</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {tags.map(tag => {
+                    const active = selectedTags.includes(tag);
+                    return (
+                      <button
+                        key={tag}
+                        onClick={() => toggleTag(tag)}
+                        className={`rounded-full border px-2.5 py-1.5 text-[10px] font-semibold transition-all active:scale-95 ${active
+                          ? "border-zinc-900 bg-zinc-900 text-white"
+                          : "border-zinc-200 bg-white text-zinc-500 hover:border-zinc-400"
+                          }`}
+                      >
+                        {tag}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
             {/* Custom user interest tags */}
             {selectedTags.filter(tag => !INTEREST_TAGS.includes(tag)).map(tag => (
               <button
@@ -542,7 +592,7 @@ export default function ProfilePage() {
               type="text"
               value={customTagInput}
               onChange={e => setCustomTagInput(e.target.value.slice(0, 24))}
-              placeholder="Add custom tag (e.g. Hiking 🥾)"
+              placeholder="Add a skill or interest"
               className="flex-1 bg-zinc-50 border border-zinc-200 rounded-xl px-3 py-2 text-xs font-medium text-zinc-900 focus:outline-none focus:border-zinc-400 transition-colors"
               onKeyDown={e => {
                 if (e.key === "Enter") {
@@ -562,6 +612,29 @@ export default function ProfilePage() {
         </div>
       </div>
 
+      {/* ═══════════════ OPEN TO ═══════════════ */}
+      <div className="mx-3 mt-3 overflow-hidden rounded-2xl border border-zinc-100 bg-white">
+        <div className="border-b border-zinc-50 px-4 py-3">
+          <h3 className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Open to</h3>
+          <p className="mt-1 text-[10px] font-medium text-zinc-400">Choose the conversations and collaborations you welcome.</p>
+        </div>
+        <div className="flex flex-wrap gap-1.5 px-4 py-3">
+          {OPEN_TO_OPTIONS.map(option => (
+            <button
+              key={option}
+              type="button"
+              onClick={() => toggleOpenTo(option)}
+              className={`rounded-full border px-2.5 py-1.5 text-[10px] font-semibold transition-all active:scale-95 ${openTo.includes(option)
+                ? "border-zinc-900 bg-zinc-900 text-white"
+                : "border-zinc-200 bg-white text-zinc-500 hover:border-zinc-400"
+                }`}
+            >
+              {option}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* ═══════════════ DISCOVERY ═══════════════ */}
       <div className="bg-white mx-3 mt-3 rounded-2xl border border-zinc-100 overflow-hidden">
         <div className="px-4 py-3 border-b border-zinc-50">
@@ -575,13 +648,13 @@ export default function ProfilePage() {
             <span className="text-xs font-bold text-zinc-900 bg-zinc-100 px-2 py-0.5 rounded-full">{radarRange} km</span>
           </div>
           <input
-            type="range" min="10" max="30" step="1"
+            type="range" min="10" max="50" step="1"
             value={radarRange}
             onChange={e => setRadarRange(parseInt(e.target.value))}
             className="w-full h-1.5 rounded-full cursor-pointer accent-zinc-900 bg-zinc-200"
           />
           <p className="text-[10px] text-zinc-400 mt-1.5">
-            How far out you scan for nearby users and activity (10km - 30km).
+            How far out you scan for nearby users and activity (10km - 50km).
           </p>
         </div>
 
@@ -592,13 +665,13 @@ export default function ProfilePage() {
             <span className="text-xs font-bold text-zinc-900 bg-zinc-100 px-2 py-0.5 rounded-full">{hotspotRange} km</span>
           </div>
           <input
-            type="range" min="10" max="30" step="1"
+            type="range" min="10" max="50" step="1"
             value={hotspotRange}
             onChange={e => setHotspotRange(parseInt(e.target.value))}
             className="w-full h-1.5 rounded-full cursor-pointer accent-zinc-900 bg-zinc-200"
           />
           <p className="text-[10px] text-zinc-400 mt-1.5">
-            Maximum distance others can be to see your posted hotspots (10km - 30km).
+            Maximum distance others can be to see your posted hotspots (10km - 50km).
           </p>
         </div>
 
@@ -748,6 +821,26 @@ export default function ProfilePage() {
         </button>
       </div>
 
+      {/* ═══════════════ DEVELOPER LINKS ═══════════════ */}
+      <footer className="mx-3 mb-8 rounded-2xl border border-zinc-100 bg-white px-4 py-4 text-center">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Developer links</p>
+        <div className="mt-3 flex flex-wrap justify-center gap-2">
+          <a href="https://github.com/gitsofaryan" target="_blank" rel="noreferrer" aria-label="GitHub" title="GitHub" className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-zinc-200 text-zinc-600 transition-colors hover:border-zinc-400 hover:text-zinc-900">
+            <Code2 size={15} />
+          </a>
+          <a href="https://instagram.com/arien_jain" target="_blank" rel="noreferrer" aria-label="Instagram" title="Instagram" className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-zinc-200 text-zinc-600 transition-colors hover:border-zinc-400 hover:text-zinc-900">
+            <Camera size={15} />
+          </a>
+          <a href="https://linkedin.com/in/aryan-jain07" target="_blank" rel="noreferrer" aria-label="LinkedIn" title="LinkedIn" className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-zinc-200 text-zinc-600 transition-colors hover:border-zinc-400 hover:text-zinc-900">
+            <BriefcaseBusiness size={15} />
+          </a>
+          <a href="https://x.com/aryanjain1506" target="_blank" rel="noreferrer" aria-label="X" title="X" className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-zinc-200 text-zinc-600 transition-colors hover:border-zinc-400 hover:text-zinc-900">
+            <AtSign size={15} />
+          </a>
+        </div>
+        <p className="mt-4 text-[10px] font-medium text-zinc-400">Made for Devcon by Arien</p>
+      </footer>
+
       {/* ═══════════════ AVATAR PICKER MODAL ═══════════════ */}
       <AnimatePresence>
         {showAvatarPicker && (
@@ -822,8 +915,8 @@ export default function ProfilePage() {
                         key={preset}
                         onClick={() => selectPresetSeed(preset)}
                         className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all active:scale-95 ${activeSeedType === preset
-                            ? "bg-zinc-900 border-zinc-900 text-white"
-                            : "bg-white border-zinc-200 text-zinc-600 hover:border-zinc-400"
+                          ? "bg-zinc-900 border-zinc-900 text-white"
+                          : "bg-white border-zinc-200 text-zinc-600 hover:border-zinc-400"
                           }`}
                       >
                         {preset}
@@ -832,8 +925,8 @@ export default function ProfilePage() {
                     <button
                       onClick={() => { setActiveSeedType("custom"); setTempSeed(customSeedText.trim() || user?.username || "user"); }}
                       className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all active:scale-95 ${activeSeedType === "custom"
-                          ? "bg-zinc-900 border-zinc-900 text-white"
-                          : "bg-white border-zinc-200 text-zinc-600 hover:border-zinc-400"
+                        ? "bg-zinc-900 border-zinc-900 text-white"
+                        : "bg-white border-zinc-200 text-zinc-600 hover:border-zinc-400"
                         }`}
                     >
                       Custom
@@ -871,8 +964,8 @@ export default function ProfilePage() {
                           key={style.id}
                           onClick={() => handleStyleChange(style.id)}
                           className={`flex flex-col items-center gap-1 p-2 rounded-xl border transition-all active:scale-95 ${isActive
-                              ? "bg-zinc-900 border-zinc-900 text-white shadow-sm"
-                              : "bg-zinc-50 border-zinc-200/60 text-zinc-700 hover:border-zinc-300"
+                            ? "bg-zinc-900 border-zinc-900 text-white shadow-sm"
+                            : "bg-zinc-50 border-zinc-200/60 text-zinc-700 hover:border-zinc-300"
                             }`}
                         >
                           <div className="w-10 h-10 rounded-lg bg-white border border-zinc-200/50 overflow-hidden flex items-center justify-center">

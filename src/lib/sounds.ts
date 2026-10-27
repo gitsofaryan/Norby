@@ -65,9 +65,10 @@ export const playSound = (type: SoundType) => {
   if (!ctx) return;
   
   try {
-    // If context is still suspended, try to resume it
+    // Mobile browsers require the context to be running before scheduling tones.
     if (ctx.state === "suspended") {
-      ctx.resume().catch(() => {});
+      ctx.resume().then(() => playSound(type)).catch(() => {});
+      return;
     }
 
     const osc = ctx.createOscillator();

@@ -23,14 +23,7 @@ function FloatingControlsInner() {
     stopBroadcast,
     showSpaceDrawer,
     setShowSpaceDrawer,
-    incomingStreams,
-    mySpeakStatus,
-    isMutedByHost,
-    isLocalMicMuted,
-    toggleLocalMic,
   } = useMapContext();
-
-  const isInAnotherSpace = !isSpaceHost && (Object.keys(incomingStreams).length > 0 || mySpeakStatus !== "listener");
 
   const handleRecenterClick = () => {
     if (typeof navigator !== "undefined" && navigator.vibrate) {
@@ -41,19 +34,15 @@ function FloatingControlsInner() {
 
   return (
     <>
-      {/* Nearby Count Indicator (Top Left) */}
-      <div className="pointer-events-auto absolute top-[72px] left-4 flex flex-col gap-2 z-[410]">
-        {/* Nearby Count */}
-        <div className="flex items-center gap-1.5 bg-white/95 backdrop-blur-sm px-2.5 py-1.5 rounded-full border border-zinc-200 shadow-sm self-start">
-          <span
-            className={`w-2 h-2 rounded-full shrink-0 ${
-              socketReady ? "bg-emerald-500 animate-pulse" : "bg-amber-400 animate-pulse"
-            }`}
-          />
-          <span className="text-[11px] font-bold text-zinc-900 leading-none">
-            {filteredUsers.length}
-          </span>
-          <span className="text-[9px] font-semibold text-zinc-400 leading-none">nearby</span>
+      {/* Nearby count */}
+      <div className="pointer-events-auto absolute top-[72px] left-4 z-[410]">
+        <div
+          aria-label={`${filteredUsers.length} people on the map`}
+          title={`${filteredUsers.length} people on the map`}
+          className="relative flex h-9 w-9 items-center justify-center rounded-full border border-zinc-200 bg-white/95 text-[11px] font-extrabold text-zinc-900 shadow-sm backdrop-blur-sm"
+        >
+          <span className={`absolute right-0.5 top-0.5 h-1.5 w-1.5 rounded-full ${socketReady ? "bg-emerald-500" : "bg-amber-400"}`} />
+          {filteredUsers.length}
         </div>
       </div>
 
@@ -135,11 +124,10 @@ function FloatingControlsInner() {
                 setShowSpaceDrawer(true);
               }
             }}
-            className={`relative w-9 h-9 flex items-center justify-center rounded-full shadow-sm transition-colors cursor-pointer border ${
-              isBroadcastingAudio && isSpaceHost
-                ? "bg-rose-600 text-white border-rose-500 animate-pulse" 
-                : "bg-white/95 backdrop-blur-sm text-zinc-600 hover:text-zinc-900 border-zinc-200"
-            }`}
+            className={`relative w-9 h-9 flex items-center justify-center rounded-full shadow-sm transition-colors cursor-pointer border ${isBroadcastingAudio && isSpaceHost
+              ? "bg-rose-600 text-white border-rose-500 animate-pulse"
+              : "bg-white/95 backdrop-blur-sm text-zinc-600 hover:text-zinc-900 border-zinc-200"
+              }`}
             title={isBroadcastingAudio && isSpaceHost ? "Stop Broadcast" : "Start Broadcast"}
           >
             {isBroadcastingAudio && isSpaceHost ? (
@@ -160,11 +148,10 @@ function FloatingControlsInner() {
                 onClick={() => {
                   setShowSpaceDrawer(!showSpaceDrawer);
                 }}
-                className={`w-9 h-9 flex items-center justify-center rounded-full shadow-sm transition-colors cursor-pointer border ${
-                  showSpaceDrawer
-                    ? "bg-zinc-900 text-white border-zinc-800"
-                    : "bg-white/95 backdrop-blur-sm text-zinc-600 hover:text-zinc-900 border-zinc-200"
-                }`}
+                className={`w-9 h-9 flex items-center justify-center rounded-full shadow-sm transition-colors cursor-pointer border ${showSpaceDrawer
+                  ? "bg-zinc-900 text-white border-zinc-800"
+                  : "bg-white/95 backdrop-blur-sm text-zinc-600 hover:text-zinc-900 border-zinc-200"
+                  }`}
                 title={showSpaceDrawer ? "Hide Space Drawer" : "Show Space Drawer"}
               >
                 <Radio size={16} className={showSpaceDrawer ? "animate-pulse" : ""} />
@@ -175,7 +162,7 @@ function FloatingControlsInner() {
       )}
 
       {/* Floating Action Controls (Bottom Right) */}
-      <div className="pointer-events-auto absolute bottom-28 right-5 flex flex-col items-center gap-4 z-[410]">
+      <div className="pointer-events-auto absolute bottom-[calc(5.75rem+env(safe-area-inset-bottom))] right-4 z-[410] flex flex-col items-center gap-3 sm:right-5 sm:gap-4">
         {/* Recenter/Compass */}
         <button
           id="btn-recenter"

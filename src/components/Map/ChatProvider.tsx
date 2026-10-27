@@ -3,6 +3,8 @@
 import { createContext, useContext, useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { globalEventBus } from "@/lib/eventBus";
 import { playSound } from "@/lib/sounds";
+import { buildBeePrompt } from "@/lib/beePrompt";
+import { parseBeeAction } from "@/lib/beeActions";
 
 export interface DirectMessage {
   id: string;
@@ -476,72 +478,59 @@ export function ChatProvider({
     if (chatUser.user_id === "bee_ai_bot") {
       setPeerTyping((prev) => ({ ...prev, bee_ai_bot: true }));
 
-      let mapContextText = "";
-      if (location) {
-        mapContextText += `• User location coordinates: Lat ${location.lat.toFixed(5)}, Lng ${location.lng.toFixed(5)}\n`;
-      } else {
-        mapContextText += `• User location coordinates: Unknown / waiting for GPS\n`;
-      }
+      const appendBeeReply = (reply: string) => {
+        const aiMsg: DirectMessage = {
+          id: `bee_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+          sender_id: "bee_ai_bot",
+          sender_username: "bee",
+          sender_avatar: "/bee_avatar.png",
+          recipient_id: myUserId,
+          text: reply,
+          timestamp: Date.now(),
+        };
 
-      if (filteredHotspots && filteredHotspots.length > 0) {
-        const hotspotList = filteredHotspots.slice(0, 3).map((h: any) => `"${h.title}"`).join(", ");
-        mapContextText += `• Active hotspots nearby: ${hotspotList}\n`;
-      } else {
-        mapContextText += `• Active hotspots nearby: None currently active\n`;
+        setChatMessages((prevMsgs) => {
+          const nextMsgs = [...prevMsgs, aiMsg];
+          const convo = [myUserId, "bee_ai_bot"].sort().join(":");
+          try {
+            const oneHourAgo = Date.now() - 60 * 60 * 1000;
+            localStorage.setItem(`chat_msgs_${convo}`, JSON.stringify(nextMsgs.filter((m) => m.timestamp > oneHourAgo)));
+          } catch (e) {}
+          return nextMsgs;
+        });
+      };
+
+      const action = parseBeeAction(text, myUserId, filteredHotspots || []);
+      if (action) {
+        if (action.type === "create_hotspot") {
+          if (!location) {
+            appendBeeReply("I need your location enabled before I can create a meetup. You can turn it on from the map.");
+          } else {
+            const created = socket.createHotspot(action.title, 15, undefined, action.category);
+            appendBeeReply(created === false
+              ? "I couldn't create that meetup because the live connection is unavailable. Try again when the socket reconnects."
+              : `Done. I started “${action.title}” as a ${action.category.replaceAll("-", " ")} meetup. You can manage it from your hotspot drawer.`);
+          }
+        } else if (action.type === "close_hotspot") {
+          const closed = socket.leaveHotspot(action.roomId);
+          appendBeeReply(closed === false ? "I couldn't close it because the live connection is unavailable." : "Your hotspot is closed. I removed it from the live map.");
+        } else {
+          const responded = socket.respondRequest(action.roomId, action.guestId, action.status);
+          appendBeeReply(responded === false
+            ? "I couldn't update that request because the live connection is unavailable."
+            : action.status === "accepted" ? "Accepted. They can now enter your hotspot chat." : "Declined. Their request will not enter your hotspot.");
+        }
+        setPeerTyping((prev) => ({ ...prev, bee_ai_bot: false }));
+        return;
       }
 
       const otherUsers = activeUsers.filter((u: any) => u.user_id !== "bee_ai_bot" && u.user_id !== myUserId);
-      if (otherUsers.length > 0) {
-        const userList = otherUsers.slice(0, 5).map((u: any) => `${u.username} (vibe: ${u.vibeEmoji || "☕"})`).join(", ");
-        mapContextText += `• Active users online: ${userList}\n`;
-      } else {
-        mapContextText += `• Active users online: None (just the user and you)\n`;
-      }
-
-      const prompt = `You are Bee 🐝, Norby's resident friend.
-
-PERSONALITY:
-• Warm, funny, caring, curious, emotionally aware
-• Talk like a real human texting a friend
-• Short messages (1-3 sentences, under 40 words)
-• Match the user's mood and energy
-• Occasionally tease playfully, never mean
-• Celebrate wins, comfort bad days, show genuine interest
-
-RULES:
-• Respond to emotion before information
-• Be conversational, not assistant-like
-• Ask follow-up questions naturally
-• Use casual language and occasional emojis
-• Never sound corporate or robotic
-• To split into two texting bubbles, separate them with '|||' (max 1 split).
-• Map Info Rule: ONLY refer to or share the LIVE MAP DATA if the user explicitly asks about coordinates, location, hotspots, or who is online. Otherwise, ignore it.
-• Image Rule: If and ONLY if the user explicitly asks you to send an image, photo, picture, or avatar, you MUST include one in markdown format. Be absolutely sure to include the exclamation mark '!' at the start (e.g. ![alt](url)) so that it renders as an image, not a text link. You can use either:
-  1. Unsplash: ![image](https://images.unsplash.com/photo-1513836279014-a89f7a76ae86?w=400) (or other valid photo ID like photo-1543466835-00a7907e9de1?w=400 or photo-1514888286974-6c03e2ca1dba?w=400)
-  2. Dicebear: ![avatar](https://api.dicebear.com/7.x/bottts/svg?seed=bee) (replace 'bee' with a keyword).
-  Do NOT send any image unless they ask.
-
-NORBY KNOWLEDGE:
-You know Norby features, hotspots, radar, nearby users, and map activity.
-
-LIVE MAP DATA:
-${mapContextText}
-
-NEVER SAY:
-• "As an AI..."
-• "How may I assist you?"
-• "I'm here to help."
-
-EXAMPLES:
-"NO WAY 😭 that's huge!"
-"okay now i'm invested, what happened next?"
-"your brain is spreading misinformation bestie 😭"
-"that's rough. wanna talk about it?"
-
-GOAL:
-Make users feel understood, welcomed, entertained, and less alone.
-
-User: ${text}`;
+      const prompt = buildBeePrompt({
+        userText: text,
+        location,
+        hotspots: filteredHotspots || [],
+        users: otherUsers,
+      });
       
       if (typeof window !== "undefined" && (window as any).puter) {
         (window as any).puter.ai.chat(prompt, { model: 'openai/gpt-4o-mini' })
@@ -561,25 +550,7 @@ User: ${text}`;
             
             messages.forEach((msgTxt: string, index: number) => {
               setTimeout(() => {
-                const aiMsg: DirectMessage = {
-                  id: `bee_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-                  sender_id: "bee_ai_bot",
-                  sender_username: "bee",
-                  sender_avatar: "/bee_avatar.png",
-                  recipient_id: myUserId,
-                  text: msgTxt,
-                  timestamp: Date.now(),
-                };
-                
-                setChatMessages((prevMsgs) => {
-                  const nextMsgs = [...prevMsgs, aiMsg];
-                  const convo = [myUserId, "bee_ai_bot"].sort().join(":");
-                  try {
-                    const oneHourAgo = Date.now() - 60 * 60 * 1000;
-                    localStorage.setItem(`chat_msgs_${convo}`, JSON.stringify(nextMsgs.filter((m) => m.timestamp > oneHourAgo)));
-                  } catch (e) {}
-                  return nextMsgs;
-                });
+                appendBeeReply(msgTxt);
                 
                 if (index === messages.length - 1) {
                   setPeerTyping((prev) => ({ ...prev, bee_ai_bot: false }));
@@ -596,7 +567,7 @@ User: ${text}`;
         }, 1000);
       }
     }
-  }, [myUserId, handle, myAvatarUrl, socket]);
+  }, [myUserId, handle, myAvatarUrl, socket, location, filteredHotspots, activeUsers]);
 
   const sendTypingState = useCallback((isTyping: boolean) => {
     if (activeChatUserRef.current && socket?.sendTypingState && activeChatUserRef.current.user_id !== "bee_ai_bot") {

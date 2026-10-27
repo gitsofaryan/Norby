@@ -168,26 +168,37 @@ export function useSocket({
     const lastSentLoc = lastSentLocationRef.current;
     const timeSinceLastUpdate = now - (lastSentTimeRef.current || 0);
     let movedSignificantly = true;
-    
+
     if (lastSentLoc) {
       // rough distance calculation (simplistic pythagorean on lat/lng)
       const dLat = (vals.location.lat - lastSentLoc.lat) * 111000; // ~meters
-      const dLng = (vals.location.lng - lastSentLoc.lng) * 111000 * Math.cos(vals.location.lat * (Math.PI/180));
-      const distance = Math.sqrt(dLat*dLat + dLng*dLng);
+      const dLng =
+        (vals.location.lng - lastSentLoc.lng) *
+        111000 *
+        Math.cos(vals.location.lat * (Math.PI / 180));
+      const distance = Math.sqrt(dLat * dLat + dLng * dLng);
       movedSignificantly = distance > 5; // > 5 meters
     }
-    
+
     // Throttle unless moved > 5m or 10s elapsed
-    if (!forceFull && !profileDirtyRef.current && !movedSignificantly && timeSinceLastUpdate < 10000) {
+    if (
+      !forceFull &&
+      !profileDirtyRef.current &&
+      !movedSignificantly &&
+      timeSinceLastUpdate < 10000
+    ) {
       return;
     }
-    
+
     lastSentTimeRef.current = now;
 
     // Send full payload only when profile data is dirty or forced
     if (profileDirtyRef.current || forceFull) {
       profileDirtyRef.current = false;
-      lastSentLocationRef.current = { lat: vals.location.lat, lng: vals.location.lng };
+      lastSentLocationRef.current = {
+        lat: vals.location.lat,
+        lng: vals.location.lng,
+      };
       ws.send(
         JSON.stringify({
           type: "location_update",
@@ -198,19 +209,27 @@ export function useSocket({
           lat: vals.location.lat,
           lng: vals.location.lng,
           bio: vals.profile?.bio || "",
+          projectDescription: vals.profile?.projectDescription || "",
+          openTo: vals.profile?.openTo || [],
           selectedTags: vals.profile?.selectedTags || [],
           gender: vals.profile?.gender || "",
           age: vals.profile?.age || "",
-          blockedUsers: [...(vals.profile?.blockedUsers || []), ...vals.localBlocks],
+          blockedUsers: [
+            ...(vals.profile?.blockedUsers || []),
+            ...vals.localBlocks,
+          ],
           radarRange: vals.profile?.radarRange || 15,
           hotspotRange: vals.profile?.hotspotRange || 15,
           is_broadcasting_audio: !!vals.isBroadcastingAudio,
           isGhostMode: !!vals.profile?.isGhostMode,
-        })
+        }),
       );
     } else {
       // Lightweight ping — just location coordinates
-      lastSentLocationRef.current = { lat: vals.location.lat, lng: vals.location.lng };
+      lastSentLocationRef.current = {
+        lat: vals.location.lat,
+        lng: vals.location.lng,
+      };
       ws.send(
         JSON.stringify({
           type: "location_update",
@@ -222,7 +241,7 @@ export function useSocket({
           lng: vals.location.lng,
           is_broadcasting_audio: !!vals.isBroadcastingAudio,
           isGhostMode: !!vals.profile?.isGhostMode,
-        })
+        }),
       );
     }
   };
@@ -250,7 +269,10 @@ export function useSocket({
       let wsUrl = process.env.NEXT_PUBLIC_WS_URL;
       if (!wsUrl) {
         const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
-        if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+        if (
+          window.location.hostname === "localhost" ||
+          window.location.hostname === "127.0.0.1"
+        ) {
           wsUrl = `ws://localhost:3001`;
         } else {
           // Auto-map dev server port 3000 to socket server port 3001 when accessed on LAN IP
@@ -265,7 +287,9 @@ export function useSocket({
         }
       }
 
-      console.log(`[norby] Connecting to WebSocket: ${wsUrl} (Retry count: ${retryCount})`);
+      console.log(
+        `[norby] Connecting to WebSocket: ${wsUrl} (Retry count: ${retryCount})`,
+      );
       ws = new WebSocket(wsUrl);
       socketRef.current = ws;
 
@@ -279,13 +303,22 @@ export function useSocket({
         const activeWs = ws;
         if (activeWs) {
           sendLocationUpdate();
-          activeWs.send(JSON.stringify({ type: "request_chats", user_id: userId }));
+          activeWs.send(
+            JSON.stringify({ type: "request_chats", user_id: userId }),
+          );
 
           // Flush general queued messages (BUG-04)
           if (outgoingQueueRef.current.length > 0) {
-            console.log(`[norby] Socket opened. Flushing ${outgoingQueueRef.current.length} queued outgoing messages...`);
+            console.log(
+              `[norby] Socket opened. Flushing ${outgoingQueueRef.current.length} queued outgoing messages...`,
+            );
             outgoingQueueRef.current.forEach((data) => {
-              if (data.type === "location_update" || data.type === "request_chats" || data.type === "request_sync") return;
+              if (
+                data.type === "location_update" ||
+                data.type === "request_chats" ||
+                data.type === "request_sync"
+              )
+                return;
               activeWs.send(JSON.stringify(data));
             });
             outgoingQueueRef.current = [];
@@ -293,7 +326,9 @@ export function useSocket({
 
           // Flush offline messages
           if (offlineMessagesRef.current.length > 0) {
-            console.log(`[norby] Offline outbox has ${offlineMessagesRef.current.length} messages. Flushing...`);
+            console.log(
+              `[norby] Offline outbox has ${offlineMessagesRef.current.length} messages. Flushing...`,
+            );
             offlineMessagesRef.current.forEach((item) => {
               activeWs.send(
                 JSON.stringify({
@@ -303,7 +338,7 @@ export function useSocket({
                   sender_id: item.msg.sender_id,
                   sender_username: item.msg.sender_username,
                   sender_avatar: item.msg.sender_avatar,
-                })
+                }),
               );
             });
             setOfflineMessages([]);
@@ -402,8 +437,12 @@ export function useSocket({
         socketRef.current = null;
 
         // Exponential backoff reconnect with jitter
-        const delay = Math.min(10000, Math.pow(2, retryCount) * 1000) + (Math.random() - 0.5) * 1000;
-        console.log(`[norby] Socket closed. Reconnecting in ${Math.round(delay)}ms...`);
+        const delay =
+          Math.min(10000, Math.pow(2, retryCount) * 1000) +
+          (Math.random() - 0.5) * 1000;
+        console.log(
+          `[norby] Socket closed. Reconnecting in ${Math.round(delay)}ms...`,
+        );
         retryCount++;
         if (retryCount >= 3) {
           setConnectionFailed(true);
@@ -439,11 +478,7 @@ export function useSocket({
   // Location-only sync (lightweight)
   useEffect(() => {
     sendLocationUpdate();
-  }, [
-    location?.lat,
-    location?.lng,
-    socketReady,
-  ]);
+  }, [location?.lat, location?.lng, socketReady]);
 
   // Profile data changes mark dirty and trigger full send
   useEffect(() => {
@@ -454,6 +489,8 @@ export function useSocket({
     vibeEmoji,
     avatarUrl,
     profile?.bio,
+    profile?.projectDescription,
+    profile?.openTo,
     profile?.selectedTags,
     profile?.gender,
     profile?.age,
@@ -473,7 +510,9 @@ export function useSocket({
       return true;
     }
     // BUG-04: Queue outgoing messages during reconnection window
-    console.log(`[norby] Socket not open. Queueing outgoing message of type: ${data?.type}`);
+    console.log(
+      `[norby] Socket not open. Queueing outgoing message of type: ${data?.type}`,
+    );
     outgoingQueueRef.current.push(data);
     return false;
   };
@@ -491,7 +530,12 @@ export function useSocket({
     });
   };
 
-  const createHotspot = (title: string, customRange: number, osmPlace?: any) => {
+  const createHotspot = (
+    title: string,
+    customRange: number,
+    osmPlace?: any,
+    category?: string,
+  ) => {
     if (!location) return false;
     return send({
       type: "create_hotspot",
@@ -500,6 +544,7 @@ export function useSocket({
       avatar_url: avatarUrl,
       vibeEmoji: vibeEmoji,
       title: title.trim(),
+      category: category || "community",
       lat: location.lat,
       lng: location.lng,
       host_bio: profile?.bio || "",
@@ -522,7 +567,11 @@ export function useSocket({
     });
   };
 
-  const respondRequest = (roomId: string, guestId: string, status: "accepted" | "declined") => {
+  const respondRequest = (
+    roomId: string,
+    guestId: string,
+    status: "accepted" | "declined",
+  ) => {
     return send({
       type: "respond_join",
       roomId,
@@ -539,7 +588,11 @@ export function useSocket({
     });
   };
 
-  const sendMessage = (roomId: string, text: string, onOptimisticAdd?: (msg: any) => void) => {
+  const sendMessage = (
+    roomId: string,
+    text: string,
+    onOptimisticAdd?: (msg: any) => void,
+  ) => {
     const ws = socketRef.current;
     const isSocketConnected = ws && ws.readyState === WebSocket.OPEN;
     const trimmedText = text.trim();
@@ -575,7 +628,7 @@ export function useSocket({
         sender_id: userId,
         sender_username: handle,
         sender_avatar: avatarUrl,
-      })
+      }),
     );
     return true;
   };
@@ -587,7 +640,10 @@ export function useSocket({
     });
   };
 
-  const respondChatRequest = (senderId: string, status: "accepted" | "rejected") => {
+  const respondChatRequest = (
+    senderId: string,
+    status: "accepted" | "rejected",
+  ) => {
     return send({
       type: "respond_chat_request",
       sender_id: senderId,
@@ -616,8 +672,6 @@ export function useSocket({
       type: "request_chats",
     });
   };
-
-
 
   const sendRtcOffer = (targetUserId: string, offer: any) => {
     return send({
@@ -656,7 +710,11 @@ export function useSocket({
     });
   };
 
-  const respondCallRequest = (targetUserId: string, responderId: string, status: "accepted" | "rejected") => {
+  const respondCallRequest = (
+    targetUserId: string,
+    responderId: string,
+    status: "accepted" | "rejected",
+  ) => {
     return send({
       type: "call_response",
       target_user_id: targetUserId,

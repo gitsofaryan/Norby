@@ -10,15 +10,16 @@ var __spreadArrays = (this && this.__spreadArrays) || function () {
 exports.__esModule = true;
 var link_1 = require("next/link");
 var navigation_1 = require("next/navigation");
+var react_1 = require("react");
 var lucide_react_1 = require("lucide-react");
 var framer_motion_1 = require("framer-motion");
 var MapProvider_1 = require("@/components/Map/MapProvider");
 var useAuth_1 = require("@/hooks/useAuth");
 var useLoading_1 = require("@/hooks/useLoading");
-function BottomNav() {
+function BottomNavInner() {
     var pathname = navigation_1.usePathname();
     var isLoading = useLoading_1.useIsLoading();
-    var _a = MapProvider_1.useMapContext(), myUserId = _a.myUserId, isInteracting = _a.isInteracting, selectedUser = _a.selectedUser, selectedHotspot = _a.selectedHotspot, filteredHotspots = _a.filteredHotspots;
+    var _a = MapProvider_1.useMapContext(), myUserId = _a.myUserId, isInteracting = _a.isInteracting, selectedUser = _a.selectedUser, selectedHotspot = _a.selectedHotspot, filteredHotspots = _a.filteredHotspots, showSpaceDrawer = _a.showSpaceDrawer;
     var chatRequests = MapProvider_1.useSocialContext().chatRequests;
     var _b = MapProvider_1.useDMContext(), activeChatUser = _b.activeChatUser, unreadMessagesCount = _b.unreadMessagesCount;
     var _c = useAuth_1.useAuth(), isSignedIn = _c.isSignedIn, user = _c.user;
@@ -34,8 +35,9 @@ function BottomNav() {
     var shouldHide = isInteracting ||
         ((pathname === null || pathname === void 0 ? void 0 : pathname.startsWith("/chat")) && activeChatUser !== null) ||
         selectedUser !== null ||
-        selectedHotspot !== null;
-    return (React.createElement(framer_motion_1.AnimatePresence, null, !shouldHide && (React.createElement(framer_motion_1.motion.div, { initial: { opacity: 0, y: 30 }, animate: { opacity: 1, y: 0 }, exit: { opacity: 0, y: 30 }, transition: { duration: 0.2, ease: "easeOut" }, className: "fixed bottom-6 left-1/2 -translate-x-1/2 z-[999] w-[calc(100%-32px)] max-w-sm bg-white/90 backdrop-blur-lg rounded-full border border-zinc-200 shadow-[0_10px_30px_rgba(0,0,0,0.08)] transition-all" },
+        selectedHotspot !== null ||
+        showSpaceDrawer;
+    return (React.createElement(framer_motion_1.AnimatePresence, null, !shouldHide && (React.createElement(framer_motion_1.motion.div, { initial: { opacity: 0, y: 30 }, animate: { opacity: 1, y: 0 }, exit: { opacity: 0, y: 30 }, transition: { duration: 0.2, ease: "easeOut" }, className: "fixed bottom-[calc(0.75rem+env(safe-area-inset-bottom))] left-1/2 z-[999] w-[calc(100%-32px)] max-w-sm -translate-x-1/2 rounded-full border border-zinc-200 bg-white/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-lg shadow-[0_10px_30px_rgba(0,0,0,0.08)] transition-all" },
         React.createElement("nav", { className: "flex items-center justify-evenly w-full h-14 px-3" }, navItems.map(function (item) {
             var isActive = pathname === item.path;
             var Icon = item.icon;
@@ -51,4 +53,4 @@ function BottomNav() {
                     React.createElement("span", { className: "relative z-10 text-[8px] font-extrabold tracking-widest uppercase transition-colors duration-200 " + (isActive ? "text-zinc-900" : "text-zinc-400") }, item.name))));
         }))))));
 }
-exports["default"] = BottomNav;
+exports["default"] = react_1.memo(BottomNavInner);

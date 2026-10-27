@@ -141,7 +141,7 @@ function LiveMapContent() {
     if (typeof window !== "undefined" && myUserId) {
       const completed = localStorage.getItem("norby_onboarding_completed") === "true";
       const restartTrigger = localStorage.getItem("norby_start_onboarding_tour") === "true";
-      
+
       if (restartTrigger) {
         localStorage.removeItem("norby_start_onboarding_tour");
         setOnboardingStep(0);
@@ -227,7 +227,7 @@ function LiveMapContent() {
     setOnboardingStep(null);
     router.push("/profile");
   };
-  
+
   const [bounds, setBoundsRaw] = useState<any>(null);
   const boundsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const setBounds = useCallback((newBounds: any) => {
@@ -471,9 +471,8 @@ function LiveMapContent() {
               initial={{ y: -20, opacity: 0, scale: 0.9 }}
               animate={{ y: 0, opacity: 1, scale: 1 }}
               exit={{ y: -20, opacity: 0, scale: 0.9 }}
-              className={`px-5 py-3 rounded-full shadow-xl text-sm font-bold flex items-center gap-2 pointer-events-auto ${
-                toast.type === "wave" ? "bg-emerald-500 text-white" : toast.type === "request" ? "bg-black text-white" : "bg-white text-zinc-900 border border-zinc-200"
-              }`}
+              className={`px-5 py-3 rounded-full shadow-xl text-sm font-bold flex items-center gap-2 pointer-events-auto ${toast.type === "wave" ? "bg-emerald-500 text-white" : toast.type === "request" ? "bg-black text-white" : "bg-white text-zinc-900 border border-zinc-200"
+                }`}
             >
               {toast.message}
             </motion.div>
@@ -487,7 +486,7 @@ function LiveMapContent() {
           <>
             {/* Transparent click blocker to prevent clicking underlying elements and messing up the tour state */}
             <div className="fixed inset-0 z-[1180] bg-transparent pointer-events-auto cursor-default" />
-            
+
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -496,7 +495,7 @@ function LiveMapContent() {
               style={
                 highlightRect
                   ? {
-                      clipPath: `polygon(
+                    clipPath: `polygon(
                         0% 0%, 0% 100%, 
                         ${highlightRect.left}px 100%, 
                         ${highlightRect.left}px ${highlightRect.top}px, 
@@ -506,7 +505,7 @@ function LiveMapContent() {
                         ${highlightRect.left}px 100%, 
                         100% 100%, 100% 0%
                       )`
-                    }
+                  }
                   : undefined
               }
             />
@@ -529,9 +528,8 @@ function LiveMapContent() {
               ]
             }}
             exit={{ opacity: 0 }}
-            className={`fixed z-[1195] pointer-events-none border-2 border-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.6)] ${
-              onboardingStep === 3 || onboardingStep === 4 ? "rounded-full" : "rounded-2xl"
-            }`}
+            className={`fixed z-[1195] pointer-events-none border-2 border-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.6)] ${onboardingStep === 3 || onboardingStep === 4 ? "rounded-full" : "rounded-2xl"
+              }`}
             style={{
               top: highlightRect.top - 4,
               left: highlightRect.left - 4,
@@ -559,27 +557,27 @@ function LiveMapContent() {
               highlightRect
                 ? highlightRect.top < (typeof window !== "undefined" ? window.innerHeight / 2 : 400)
                   ? {
-                      top: highlightRect.top + highlightRect.height + 16,
-                      left: "16px",
-                      right: "16px",
-                      marginLeft: "auto",
-                      marginRight: "auto"
-                    }
-                  : {
-                      bottom: (typeof window !== "undefined" ? window.innerHeight - highlightRect.top : 400) + 16,
-                      left: "16px",
-                      right: "16px",
-                      marginLeft: "auto",
-                      marginRight: "auto"
-                    }
-                : {
-                    top: "50%",
+                    top: highlightRect.top + highlightRect.height + 16,
                     left: "16px",
                     right: "16px",
-                    marginTop: "-145px",
                     marginLeft: "auto",
                     marginRight: "auto"
                   }
+                  : {
+                    bottom: (typeof window !== "undefined" ? window.innerHeight - highlightRect.top : 400) + 16,
+                    left: "16px",
+                    right: "16px",
+                    marginLeft: "auto",
+                    marginRight: "auto"
+                  }
+                : {
+                  top: "50%",
+                  left: "16px",
+                  right: "16px",
+                  marginTop: "-145px",
+                  marginLeft: "auto",
+                  marginRight: "auto"
+                }
             }
           >
             {/* Skip button */}
@@ -600,9 +598,8 @@ function LiveMapContent() {
                 {[0, 1, 2, 3, 4, 5, 6, 7].map((s) => (
                   <div
                     key={s}
-                    className={`h-1.5 rounded-full transition-all duration-300 ${
-                      onboardingStep === s ? "w-4 bg-amber-500" : "w-1 bg-zinc-200"
-                    }`}
+                    className={`h-1.5 rounded-full transition-all duration-300 ${onboardingStep === s ? "w-4 bg-amber-500" : "w-1 bg-zinc-200"
+                      }`}
                   />
                 ))}
               </div>

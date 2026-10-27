@@ -14,6 +14,8 @@ export type UserProfile = {
   avatar_url: string;
   handle: string;
   bio: string;
+  projectDescription?: string;
+  openTo?: string[];
   vibeEmoji: string;
   radarRange: number;
   hotspotRange?: number;
@@ -87,17 +89,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         const parsed = JSON.parse(raw);
         let rRange = parsed.radarRange;
         if (typeof rRange !== "number" || rRange < 10) rRange = 15;
-        if (rRange > 30) rRange = 30;
+        if (rRange > 50) rRange = 50;
 
         let hRange = parsed.hotspotRange;
         if (typeof hRange !== "number" || hRange < 10) hRange = 15;
-        if (hRange > 30) hRange = 30;
+        if (hRange > 50) hRange = 50;
 
         setProfile({
           gender: "",
           age: "",
           blockedUsers: [],
           ...parsed,
+          projectDescription: typeof parsed.projectDescription === "string" ? parsed.projectDescription.slice(0, 200) : "",
+          openTo: Array.isArray(parsed.openTo) ? parsed.openTo.filter((value: unknown): value is string => typeof value === "string").slice(0, 9) : [],
           radarRange: rRange,
           hotspotRange: hRange,
         });
@@ -109,6 +113,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           avatar_url: getAvatarUrl(u.username),
           handle: u.username,
           bio: "",
+          projectDescription: "",
+          openTo: [],
           vibeEmoji: "☕",
           radarRange: 15,
           hotspotRange: 15,

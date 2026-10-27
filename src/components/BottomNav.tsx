@@ -46,7 +46,7 @@ function BottomNavInner() {
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 30 }}
           transition={{ duration: 0.2, ease: "easeOut" }}
-          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[999] w-[calc(100%-32px)] max-w-sm bg-white/90 backdrop-blur-lg rounded-full border border-zinc-200 shadow-[0_10px_30px_rgba(0,0,0,0.08)] transition-all"
+          className="fixed bottom-[calc(0.75rem+env(safe-area-inset-bottom))] left-1/2 z-[999] w-[calc(100%-32px)] max-w-sm -translate-x-1/2 rounded-full border border-zinc-200 bg-white/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-lg shadow-[0_10px_30px_rgba(0,0,0,0.08)] transition-all"
         >
           <nav className="flex items-center justify-evenly w-full h-14 px-3">
             {navItems.map((item) => {

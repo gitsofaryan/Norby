@@ -27,6 +27,9 @@ interface MapContextType {
   isStasis: boolean;
   accuracy: number | null;
   accuracySource: "gps-high" | "gps-low" | "ip-fallback" | "offline" | "waiting";
+  locationEnabled: boolean;
+  requestLocation: () => void;
+  disableLocation: () => void;
   refreshRadar: () => void;
 
   // Socket state
@@ -59,6 +62,8 @@ interface MapContextType {
   setShowIntentModal: (show: boolean) => void;
   intentText: string;
   setIntentText: (text: string) => void;
+  intentCategory: string;
+  setIntentCategory: (category: string) => void;
   customHotspotRange: number;
   setCustomHotspotRange: (range: number) => void;
 
@@ -233,6 +238,7 @@ export function MapProvider({ children }: { children: React.ReactNode }) {
 
   const [showIntentModal, setShowIntentModal] = useState(false);
   const [intentText, setIntentText] = useState("");
+  const [intentCategory, setIntentCategory] = useState("coffee-chat");
   const [customHotspotRange, setCustomHotspotRange] = useState(15);
 
   useEffect(() => {
@@ -285,6 +291,9 @@ export function MapProvider({ children }: { children: React.ReactNode }) {
     isStasis,
     accuracy,
     accuracySource,
+    locationEnabled,
+    requestLocation,
+    disableLocation,
     refreshLocation,
   } = useGeolocation(maskLocation);
 
@@ -709,10 +718,10 @@ export function MapProvider({ children }: { children: React.ReactNode }) {
   const postIntent = useCallback((osmPlace?: any) => {
     if (!intentText.trim()) return;
     playSound("success");
-    socket.createHotspot(intentText, customHotspotRange, osmPlace);
+    socket.createHotspot(intentText, customHotspotRange, osmPlace, intentCategory);
     setIntentText("");
     setShowIntentModal(false);
-  }, [intentText, customHotspotRange, socket]);
+  }, [intentText, customHotspotRange, intentCategory, socket]);
 
   const requestJoin = useCallback((roomId?: any) => {
     const id = typeof roomId === "string" ? roomId : selectedHotspotRef.current?.id;
@@ -891,15 +900,17 @@ export function MapProvider({ children }: { children: React.ReactNode }) {
 
     // Match by bio or tags
     const bio = (u.bio || "").toLowerCase();
+    const projectDescription = u.projectDescription || "";
+    const openTo = Array.isArray(u.openTo) ? u.openTo.join(" ") : "";
     const tags = u.selectedTags || [];
-    if (matchesMapFilterText(bio, key)) return true;
+    if (matchesMapFilterText(`${bio} ${projectDescription} ${openTo}`, key)) return true;
     if (tags.some((tag: string) => matchesMapFilterText(tag, key))) return true;
 
     return false;
   }
 
   // Filter lists based on user settings and ranges
-  const radarRadius = profile?.radarRange || 15;
+  const radarRadius = Math.max(10, Math.min(50, profile?.radarRange || 15));
 
   const filteredUsers = useMemo(() => {
     const blockedIds = [...(profile?.blockedUsers || []), ...localBlocks];
@@ -937,6 +948,9 @@ export function MapProvider({ children }: { children: React.ReactNode }) {
     isStasis,
     accuracy,
     accuracySource,
+    locationEnabled,
+    requestLocation,
+    disableLocation,
     refreshRadar,
 
     socketReady: socket.socketReady,
@@ -964,6 +978,8 @@ export function MapProvider({ children }: { children: React.ReactNode }) {
     setShowIntentModal,
     intentText,
     setIntentText,
+    intentCategory,
+    setIntentCategory,
     customHotspotRange,
     setCustomHotspotRange,
 
@@ -1048,6 +1064,9 @@ export function MapProvider({ children }: { children: React.ReactNode }) {
     isStasis,
     accuracy,
     accuracySource,
+    locationEnabled,
+    requestLocation,
+    disableLocation,
 
     socket.socketReady,
     socket.connectionState,
@@ -1066,6 +1085,7 @@ export function MapProvider({ children }: { children: React.ReactNode }) {
 
     showIntentModal,
     intentText,
+    intentCategory,
     customHotspotRange,
 
     hasWaved,
@@ -1110,6 +1130,7 @@ export function MapProvider({ children }: { children: React.ReactNode }) {
     setSelectedHotspot,
     setShowIntentModal,
     setIntentText,
+    setIntentCategory,
     setCustomHotspotRange,
     setHasWaved,
     setConfirmBlock,

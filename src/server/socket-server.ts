@@ -6,33 +6,32 @@ import * as client from "prom-client";
 import crypto from "crypto";
 
 // ── Metrics Configuration ────────────────────────────────────────────────────
-client.collectDefaultMetrics({ prefix: 'norby_socket_' });
+client.collectDefaultMetrics({ prefix: "norby_socket_" });
 
 const metricMessagesReceived = new client.Counter({
-  name: 'norby_socket_messages_received_total',
-  help: 'Total number of WebSocket messages received',
-  labelNames: ['type']
+  name: "norby_socket_messages_received_total",
+  help: "Total number of WebSocket messages received",
+  labelNames: ["type"],
 });
 
 const metricMessagesSent = new client.Counter({
-  name: 'norby_socket_messages_sent_total',
-  help: 'Total number of WebSocket messages sent',
-  labelNames: ['type']
+  name: "norby_socket_messages_sent_total",
+  help: "Total number of WebSocket messages sent",
+  labelNames: ["type"],
 });
 
 const metricSyncDuration = new client.Histogram({
-  name: 'norby_socket_sync_duration_seconds',
-  help: 'Time taken to execute full synchronization logic',
-  buckets: [0.01, 0.05, 0.1, 0.25, 0.5, 1, 2]
+  name: "norby_socket_sync_duration_seconds",
+  help: "Time taken to execute full synchronization logic",
+  buckets: [0.01, 0.05, 0.1, 0.25, 0.5, 1, 2],
 });
 
 const metricRedisCommands = new client.Histogram({
-  name: 'norby_socket_redis_command_duration_seconds',
-  help: 'Time taken to execute Redis commands',
-  labelNames: ['command'],
-  buckets: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5]
+  name: "norby_socket_redis_command_duration_seconds",
+  help: "Time taken to execute Redis commands",
+  labelNames: ["command"],
+  buckets: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5],
 });
-
 
 // Global crash guards — never let the server process die
 process.on("uncaughtException", (err) => {
@@ -68,7 +67,7 @@ async function userExists(userId: string): Promise<boolean> {
     const exists = await redisPub.hExists("norby:active_users", userId);
     return !!exists;
   }
-  return Array.from(clientsLocal.values()).some(u => u.user_id === userId);
+  return Array.from(clientsLocal.values()).some((u) => u.user_id === userId);
 }
 
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3001;
@@ -83,6 +82,8 @@ interface ClientInfo {
   lng: number;
   last_seen: number;
   bio?: string;
+  projectDescription?: string;
+  openTo?: string[];
   selectedTags?: string[];
   gender?: string;
   age?: number;
@@ -115,6 +116,7 @@ interface Hotspot {
   host_username: string;
   host_avatar: string;
   title: string;
+  category?: string;
   vibeEmoji: string;
   lat: number;
   lng: number;
@@ -160,6 +162,8 @@ const LocationUpdateSchema = z.object({
   lat: z.number(),
   lng: z.number(),
   bio: z.string().max(200).optional().nullable(),
+  projectDescription: z.string().max(200).optional().nullable(),
+  openTo: z.array(z.string().max(50)).max(9).optional().nullable(),
   selectedTags: z.array(z.string().max(50)).max(6).optional().nullable(),
   gender: z.string().optional().nullable(),
   age: z
@@ -167,8 +171,8 @@ const LocationUpdateSchema = z.object({
     .optional()
     .nullable(),
   blockedUsers: z.array(z.string()).optional().nullable(),
-  radarRange: z.number().optional().nullable(),
-  hotspotRange: z.number().optional().nullable(),
+  radarRange: z.number().min(10).max(50).optional().nullable(),
+  hotspotRange: z.number().min(10).max(50).optional().nullable(),
   is_broadcasting_audio: z.boolean().optional().nullable(),
   isGhostMode: z.boolean().optional().nullable(),
 });
@@ -180,6 +184,7 @@ const CreateHotspotSchema = z.object({
   avatar_url: z.string(),
   vibeEmoji: z.string(),
   title: z.string().min(1).max(100),
+  category: z.string().max(50).optional().nullable(),
   lat: z.number(),
   lng: z.number(),
   host_bio: z.string().max(200).optional().nullable(),
@@ -189,7 +194,7 @@ const CreateHotspotSchema = z.object({
     .union([z.number(), z.string(), z.literal("")])
     .optional()
     .nullable(),
-  hotspotRange: z.number().optional().nullable(),
+  hotspotRange: z.number().min(10).max(50).optional().nullable(),
   osm_place_id: z.number().optional().nullable(),
   osm_place_name: z.string().optional().nullable(),
 });
@@ -258,8 +263,6 @@ const RequestChatsSchema = z.object({
   type: z.literal("request_chats"),
   user_id: z.string().optional(),
 });
-
-
 
 // ── Call Signaling Schemas ──
 const CallRequestSchema = z.object({
@@ -350,23 +353,29 @@ setInterval(async () => {
   if (useRedis && redisPub) {
     try {
       // Hotspots cleanup via ZSET sweep instead of hGetAll
-      const expiredTimer = metricRedisCommands.startTimer({ command: 'ZRANGEBYSCORE' });
-      const expiredIds = await redisPub.zRangeByScore("norby:hotspot_expirations", 0, now);
+      const expiredTimer = metricRedisCommands.startTimer({
+        command: "ZRANGEBYSCORE",
+      });
+      const expiredIds = await redisPub.zRangeByScore(
+        "norby:hotspot_expirations",
+        0,
+        now,
+      );
       expiredTimer();
-      
+
       if (expiredIds.length > 0) {
         const pipeline = redisPub.multi();
-        expiredIds.forEach(id => {
+        expiredIds.forEach((id) => {
           pipeline.hDel("norby:hotspots", id);
           pipeline.zRem("norby:hotspot_locations", id);
           pipeline.zRem("norby:hotspot_expirations", id);
         });
         await pipeline.exec();
-        
-        expiredIds.forEach(id => logEvent("hotspot_expired", { id }));
+
+        expiredIds.forEach((id) => logEvent("hotspot_expired", { id }));
         publishHotspotUpdate();
       }
-      
+
       // Chat requests cleanup is now handled lazily per-user in sendChatsSync!
     } catch (e: any) {
       logEvent("redis_cleanup_error", { error: e.message });
@@ -449,7 +458,7 @@ function broadcastLocal(msg: object) {
   wss.clients.forEach((client) => {
     if (client.readyState === WebSocket.OPEN) {
       client.send(payload);
-      metricMessagesSent.inc({ type: 'local_broadcast' });
+      metricMessagesSent.inc({ type: "local_broadcast" });
     }
   });
 }
@@ -471,15 +480,17 @@ async function sendChatsSync(ws: WebSocket, userId: string) {
 
   if (useRedis && redisPub) {
     try {
-      const metricEnd = metricRedisCommands.startTimer({ command: 'ZREMRANGEBYSCORE' });
+      const metricEnd = metricRedisCommands.startTimer({
+        command: "ZREMRANGEBYSCORE",
+      });
       await redisPub.zRemRangeByScore(`norby:chat_reqs:${userId}`, 0, dayAgo);
       metricEnd();
-      
-      const fetchEnd = metricRedisCommands.startTimer({ command: 'ZRANGE' });
+
+      const fetchEnd = metricRedisCommands.startTimer({ command: "ZRANGE" });
       const raw = await redisPub.zRange(`norby:chat_reqs:${userId}`, 0, -1);
       fetchEnd();
-      
-      allRequests = raw.map(r => JSON.parse(r));
+
+      allRequests = raw.map((r) => JSON.parse(r));
     } catch (e: any) {
       logEvent("redis_sync_chats_error", { error: e.message });
     }
@@ -495,7 +506,11 @@ async function sendChatsSync(ws: WebSocket, userId: string) {
   }
 
   // Ensure uniqueness in case of overlapping records
-  const uniqueRequests = Array.from(new Map(allRequests.map(r => [`${r.sender_id}:${r.target_id}`, r])).values());
+  const uniqueRequests = Array.from(
+    new Map(
+      allRequests.map((r) => [`${r.sender_id}:${r.target_id}`, r]),
+    ).values(),
+  );
 
   ws.send(
     JSON.stringify({
@@ -503,7 +518,7 @@ async function sendChatsSync(ws: WebSocket, userId: string) {
       requests: uniqueRequests,
     }),
   );
-  metricMessagesSent.inc({ type: 'chats_list' });
+  metricMessagesSent.inc({ type: "chats_list" });
 }
 
 async function triggerChatsSync(userId: string) {
@@ -599,7 +614,7 @@ async function sendSync(ws: WebSocket) {
         { EX: 45 },
       );
 
-      const maxRange = Math.max(10, Math.min(30, clientInfo.radarRange || 15));
+      const maxRange = Math.max(10, Math.min(50, clientInfo.radarRange || 15));
 
       // Geo-spatial query for active users
       const nearbyUserIds = await redisPub.geoSearch(
@@ -613,7 +628,7 @@ async function sendSync(ws: WebSocket) {
           "norby:active_users",
           nearbyUserIds,
         )) as any[];
-        
+
         const now = Date.now();
         allUsers = rawUsers
           .filter(Boolean)
@@ -635,10 +650,13 @@ async function sendSync(ws: WebSocket) {
       const expiredHotspotIds: string[] = [];
 
       if (nearbyHotspotIds && nearbyHotspotIds.length > 0) {
-        const fetchTimer = metricRedisCommands.startTimer({ command: 'HMGET' });
-        const rawHotspots = await redisPub.hmGet("norby:hotspots", nearbyHotspotIds);
+        const fetchTimer = metricRedisCommands.startTimer({ command: "HMGET" });
+        const rawHotspots = await redisPub.hmGet(
+          "norby:hotspots",
+          nearbyHotspotIds,
+        );
         fetchTimer();
-        
+
         rawHotspots.forEach((raw, i) => {
           if (!raw) return;
           try {
@@ -693,7 +711,7 @@ async function sendSync(ws: WebSocket) {
       u.lat,
       u.lng,
     );
-    const maxRange = Math.max(10, Math.min(30, clientInfo.radarRange || 15));
+    const maxRange = Math.max(10, Math.min(50, clientInfo.radarRange || 15));
     return distance <= maxRange;
   });
 
@@ -758,7 +776,7 @@ function broadcastLocationUpdate(data: ClientInfo, senderWs?: WebSocket) {
         );
         const maxRange = Math.max(
           10,
-          Math.min(30, recipientInfo.radarRange || 15),
+          Math.min(50, recipientInfo.radarRange || 15),
         );
         if (distance > maxRange) return;
       }
@@ -775,7 +793,10 @@ function broadcastLocationUpdate(data: ClientInfo, senderWs?: WebSocket) {
 // ── Connection Handler ───────────────────────────────────────────────────────
 wss.on("connection", async (ws: any) => {
   ws.socketId = crypto.randomUUID();
-  logEvent("client_connected", { connected_clients: wss.clients.size, socket_id: ws.socketId });
+  logEvent("client_connected", {
+    connected_clients: wss.clients.size,
+    socket_id: ws.socketId,
+  });
   ws.isAlive = true;
   ws.on("pong", () => {
     ws.isAlive = true;
@@ -892,19 +913,49 @@ wss.on("connection", async (ws: any) => {
           lat: data.lat,
           lng: data.lng,
           last_seen: Date.now(),
-          bio: data.bio !== undefined ? sanitizeInput(data.bio) : (existing?.bio || ""),
-          selectedTags: data.selectedTags !== undefined ? (data.selectedTags || []) : (existing?.selectedTags || []),
-          gender: data.gender !== undefined ? (data.gender || "") : (existing?.gender || ""),
+          bio:
+            data.bio !== undefined
+              ? sanitizeInput(data.bio)
+              : existing?.bio || "",
+          projectDescription:
+            data.projectDescription !== undefined
+              ? sanitizeInput(data.projectDescription)
+              : existing?.projectDescription || "",
+          openTo:
+            data.openTo !== undefined
+              ? (data.openTo || [])
+                  .slice(0, 9)
+                  .map((value: string) => sanitizeInput(value))
+              : existing?.openTo || [],
+          selectedTags:
+            data.selectedTags !== undefined
+              ? data.selectedTags || []
+              : existing?.selectedTags || [],
+          gender:
+            data.gender !== undefined
+              ? data.gender || ""
+              : existing?.gender || "",
           age: typeof data.age === "number" ? data.age : existing?.age,
-          blockedUsers: data.blockedUsers !== undefined ? (data.blockedUsers || []) : (existing?.blockedUsers || []),
+          blockedUsers:
+            data.blockedUsers !== undefined
+              ? data.blockedUsers || []
+              : existing?.blockedUsers || [],
           radarRange:
-            typeof data.radarRange === "number" ? data.radarRange : (existing?.radarRange || 15),
+            typeof data.radarRange === "number"
+              ? Math.max(10, Math.min(50, data.radarRange))
+              : existing?.radarRange || 15,
           hotspotRange:
             typeof data.hotspotRange === "number"
-              ? data.hotspotRange
-              : (existing?.hotspotRange || 15),
-          is_broadcasting_audio: data.is_broadcasting_audio !== undefined ? !!data.is_broadcasting_audio : (existing?.is_broadcasting_audio || false),
-          isGhostMode: data.isGhostMode !== undefined ? !!data.isGhostMode : (existing?.isGhostMode || false),
+              ? Math.max(10, Math.min(50, data.hotspotRange))
+              : existing?.hotspotRange || 15,
+          is_broadcasting_audio:
+            data.is_broadcasting_audio !== undefined
+              ? !!data.is_broadcasting_audio
+              : existing?.is_broadcasting_audio || false,
+          isGhostMode:
+            data.isGhostMode !== undefined
+              ? !!data.isGhostMode
+              : existing?.isGhostMode || false,
         };
 
         clientsLocal.set(ws, info);
@@ -912,7 +963,9 @@ wss.on("connection", async (ws: any) => {
         // Kick on Block relationship sync (BUG-08 optimization: run only when blocks list changes)
         const infoBlocks = info.blockedUsers || [];
         const existingBlocks = existing?.blockedUsers || [];
-        const blocksChanged = JSON.stringify([...infoBlocks].sort()) !== JSON.stringify([...existingBlocks].sort());
+        const blocksChanged =
+          JSON.stringify([...infoBlocks].sort()) !==
+          JSON.stringify([...existingBlocks].sort());
 
         if (infoBlocks.length > 0 && blocksChanged) {
           if (useRedis && redisPub) {
@@ -1015,9 +1068,13 @@ wss.on("connection", async (ws: any) => {
             member: info.user_id,
           });
 
-          await redisPub.set(`norby:user_session:${info.user_id}`, ws.socketId || "default", {
-            EX: 45,
-          });
+          await redisPub.set(
+            `norby:user_session:${info.user_id}`,
+            ws.socketId || "default",
+            {
+              EX: 45,
+            },
+          );
 
           const nowBroadcast = Date.now();
           const lastTime = lastBroadcastTime.get(info.user_id) || 0;
@@ -1058,6 +1115,7 @@ wss.on("connection", async (ws: any) => {
           host_username: data.username,
           host_avatar: data.avatar_url || "",
           title: sanitizeInput(data.title),
+          category: data.category ? sanitizeInput(data.category) : "community",
           vibeEmoji: data.vibeEmoji || "☕",
           lat: data.lat,
           lng: data.lng,
@@ -1109,7 +1167,7 @@ wss.on("connection", async (ws: any) => {
             latitude: newHotspot.lat,
             member: roomId,
           });
-          
+
           await redisPub.zAdd("norby:hotspot_expirations", {
             score: newHotspot.expires_at,
             value: roomId,
@@ -1490,20 +1548,32 @@ wss.on("connection", async (ws: any) => {
         }
       } else if (data.type === "send_wave") {
         const { target_user_id, sender_id, sender_username } = data;
-        
+
         // BUG-20: Validate target user existence
         const exists = await userExists(target_user_id);
         if (!exists) {
-          logEvent("wave_rejected_target_missing", { target_user_id, sender_id });
-          ws.send(JSON.stringify({ type: "error", message: "Target user is offline or does not exist." }));
+          logEvent("wave_rejected_target_missing", {
+            target_user_id,
+            sender_id,
+          });
+          ws.send(
+            JSON.stringify({
+              type: "error",
+              message: "Target user is offline or does not exist.",
+            }),
+          );
           return;
         }
 
         logEvent("wave_sent", { target_user_id, sender_id, sender_username });
-        console.log(`[socket_server] Wave sent from @${sender_username} (${sender_id}) targeting: ${target_user_id}`);
+        console.log(
+          `[socket_server] Wave sent from @${sender_username} (${sender_id}) targeting: ${target_user_id}`,
+        );
 
         if (useRedis && redisPub) {
-          console.log(`[socket_server] Publishing wave to Redis for: ${target_user_id}`);
+          console.log(
+            `[socket_server] Publishing wave to Redis for: ${target_user_id}`,
+          );
           await redisPub.publish(
             "norby:direct_notifications",
             JSON.stringify({
@@ -1518,7 +1588,9 @@ wss.on("connection", async (ws: any) => {
         } else {
           const targetSocket = findLocalSocketByUserId(target_user_id);
           if (targetSocket) {
-            console.log(`[socket_server] Wave forwarded to active socket for target user ID: ${target_user_id}`);
+            console.log(
+              `[socket_server] Wave forwarded to active socket for target user ID: ${target_user_id}`,
+            );
             targetSocket.send(
               JSON.stringify({
                 type: "wave_received",
@@ -1527,7 +1599,9 @@ wss.on("connection", async (ws: any) => {
               }),
             );
           } else {
-            console.warn(`[socket_server] Wave target socket NOT found for user ID: ${target_user_id}`);
+            console.warn(
+              `[socket_server] Wave target socket NOT found for user ID: ${target_user_id}`,
+            );
           }
         }
       } else if (data.type === "send_chat_request") {
@@ -1538,8 +1612,16 @@ wss.on("connection", async (ws: any) => {
         // BUG-20: Validate target user existence
         const exists = await userExists(target_user_id);
         if (!exists) {
-          logEvent("chat_request_rejected_target_missing", { target_user_id, sender_id: senderInfo.user_id });
-          ws.send(JSON.stringify({ type: "error", message: "Target user is offline or does not exist." }));
+          logEvent("chat_request_rejected_target_missing", {
+            target_user_id,
+            sender_id: senderInfo.user_id,
+          });
+          ws.send(
+            JSON.stringify({
+              type: "error",
+              message: "Target user is offline or does not exist.",
+            }),
+          );
           return;
         }
 
@@ -1548,9 +1630,15 @@ wss.on("connection", async (ws: any) => {
         // Prevent duplicate pending chat requests (anti-spam)
         let existingRequest: ChatRequest | null = null;
         if (useRedis && redisPub) {
-          const raw = await redisPub.zRange(`norby:chat_reqs:${senderInfo.user_id}`, 0, -1);
-          const parsed = raw.map(r => JSON.parse(r) as ChatRequest);
-          existingRequest = parsed.find(r => `${r.sender_id}:${r.target_id}` === reqKey) || null;
+          const raw = await redisPub.zRange(
+            `norby:chat_reqs:${senderInfo.user_id}`,
+            0,
+            -1,
+          );
+          const parsed = raw.map((r) => JSON.parse(r) as ChatRequest);
+          existingRequest =
+            parsed.find((r) => `${r.sender_id}:${r.target_id}` === reqKey) ||
+            null;
         } else {
           existingRequest = chatRequestsLocal.get(reqKey) || null;
         }
@@ -1585,8 +1673,14 @@ wss.on("connection", async (ws: any) => {
 
         if (useRedis && redisPub) {
           const payload = JSON.stringify(newRequest);
-          await redisPub.zAdd(`norby:chat_reqs:${senderInfo.user_id}`, { score: newRequest.timestamp, value: payload });
-          await redisPub.zAdd(`norby:chat_reqs:${target_user_id}`, { score: newRequest.timestamp, value: payload });
+          await redisPub.zAdd(`norby:chat_reqs:${senderInfo.user_id}`, {
+            score: newRequest.timestamp,
+            value: payload,
+          });
+          await redisPub.zAdd(`norby:chat_reqs:${target_user_id}`, {
+            score: newRequest.timestamp,
+            value: payload,
+          });
           await redisPub.publish(
             "norby:direct_notifications",
             JSON.stringify({
@@ -1622,7 +1716,11 @@ wss.on("connection", async (ws: any) => {
 
         if (useRedis && redisPub) {
           // Since we changed to ZSET, we fetch all from responder and find the specific one
-          const raw = await redisPub.zRange(`norby:chat_reqs:${responderInfo.user_id}`, 0, -1);
+          const raw = await redisPub.zRange(
+            `norby:chat_reqs:${responderInfo.user_id}`,
+            0,
+            -1,
+          );
           for (const r of raw) {
             const parsed = JSON.parse(r) as ChatRequest;
             if (`${parsed.sender_id}:${parsed.target_id}` === reqKey) {
@@ -1646,15 +1744,24 @@ wss.on("connection", async (ws: any) => {
 
         if (useRedis && redisPub) {
           const payload = JSON.stringify(request);
-          
+
           // Remove old versions from both sets before adding updated one to ensure score/value replaces old state
           if (oldPayload) {
             await redisPub.zRem(`norby:chat_reqs:${sender_id}`, oldPayload);
-            await redisPub.zRem(`norby:chat_reqs:${responderInfo.user_id}`, oldPayload);
+            await redisPub.zRem(
+              `norby:chat_reqs:${responderInfo.user_id}`,
+              oldPayload,
+            );
           }
-          
-          await redisPub.zAdd(`norby:chat_reqs:${sender_id}`, { score: request.timestamp, value: payload });
-          await redisPub.zAdd(`norby:chat_reqs:${responderInfo.user_id}`, { score: request.timestamp, value: payload });
+
+          await redisPub.zAdd(`norby:chat_reqs:${sender_id}`, {
+            score: request.timestamp,
+            value: payload,
+          });
+          await redisPub.zAdd(`norby:chat_reqs:${responderInfo.user_id}`, {
+            score: request.timestamp,
+            value: payload,
+          });
           await redisPub.publish(
             "norby:direct_notifications",
             JSON.stringify({
@@ -1709,13 +1816,21 @@ wss.on("connection", async (ws: any) => {
         // BUG-20: Validate target user existence
         const exists = await userExists(recipient_id);
         if (!exists) {
-          logEvent("direct_message_rejected_target_missing", { recipient_id, sender_id: senderInfo.user_id });
-          ws.send(JSON.stringify({ type: "error", message: "Target user is offline or does not exist." }));
+          logEvent("direct_message_rejected_target_missing", {
+            recipient_id,
+            sender_id: senderInfo.user_id,
+          });
+          ws.send(
+            JSON.stringify({
+              type: "error",
+              message: "Target user is offline or does not exist.",
+            }),
+          );
           return;
         }
 
         // Note: Friendship state is now managed client-side via decentralized Puter KV.
-        // The server acts as a dumb relay for direct messages, leaving permission 
+        // The server acts as a dumb relay for direct messages, leaving permission
         // enforcement to the clients.
 
         const msgId = `dm_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
@@ -1819,7 +1934,6 @@ wss.on("connection", async (ws: any) => {
           }
           await sendChatsSync(ws, userId);
         }
-
       } else if (
         data.type === "rtc_offer" ||
         data.type === "rtc_answer" ||
@@ -1830,18 +1944,31 @@ wss.on("connection", async (ws: any) => {
       ) {
         const { target_user_id } = data;
         const senderInfo = clientsLocal.get(ws);
-        
+
         // BUG-20: Validate target user existence
         const exists = await userExists(target_user_id);
         if (!exists) {
-          logEvent("rtc_signal_rejected_target_missing", { type: data.type, target_user_id, sender_id: senderInfo?.user_id });
-          ws.send(JSON.stringify({ type: "error", message: "Target user is offline or does not exist." }));
+          logEvent("rtc_signal_rejected_target_missing", {
+            type: data.type,
+            target_user_id,
+            sender_id: senderInfo?.user_id,
+          });
+          ws.send(
+            JSON.stringify({
+              type: "error",
+              message: "Target user is offline or does not exist.",
+            }),
+          );
           return;
         }
 
-        console.log(`[socket_server] Signaling message type: ${data.type} targeting user ID: ${target_user_id}`);
+        console.log(
+          `[socket_server] Signaling message type: ${data.type} targeting user ID: ${target_user_id}`,
+        );
         if (useRedis && redisPub) {
-          console.log(`[socket_server] Publishing to Redis for target user ID: ${target_user_id}`);
+          console.log(
+            `[socket_server] Publishing to Redis for target user ID: ${target_user_id}`,
+          );
           await redisPub.publish(
             "norby:direct_notifications",
             JSON.stringify({
@@ -1852,11 +1979,18 @@ wss.on("connection", async (ws: any) => {
         } else {
           const targetSocket = findLocalSocketByUserId(target_user_id);
           if (targetSocket) {
-            console.log(`[socket_server] Found local socket for target user ID: ${target_user_id}, sending message.`);
+            console.log(
+              `[socket_server] Found local socket for target user ID: ${target_user_id}, sending message.`,
+            );
             targetSocket.send(JSON.stringify(data));
           } else {
-            const activeUserIds = Array.from(clientsLocal.values()).map(info => info.user_id);
-            console.warn(`[socket_server] Target socket NOT found for user ID: ${target_user_id}. Active users:`, activeUserIds);
+            const activeUserIds = Array.from(clientsLocal.values()).map(
+              (info) => info.user_id,
+            );
+            console.warn(
+              `[socket_server] Target socket NOT found for user ID: ${target_user_id}. Active users:`,
+              activeUserIds,
+            );
           }
         }
       }
@@ -1887,7 +2021,10 @@ wss.on("connection", async (ws: any) => {
         // Only clean up session if no other active local sockets for this user ID remain open.
         let hasOtherLocal = false;
         for (const [otherWs, otherInfo] of clientsLocal.entries()) {
-          if (otherInfo.user_id === info.user_id && otherWs.readyState === WebSocket.OPEN) {
+          if (
+            otherInfo.user_id === info.user_id &&
+            otherWs.readyState === WebSocket.OPEN
+          ) {
             hasOtherLocal = true;
             break;
           }
@@ -1895,10 +2032,15 @@ wss.on("connection", async (ws: any) => {
 
         if (useRedis && redisPub) {
           try {
-            const activeSocketId = await redisPub.get(`norby:user_session:${info.user_id}`);
+            const activeSocketId = await redisPub.get(
+              `norby:user_session:${info.user_id}`,
+            );
             // Delete session from Redis only if this socket is the one currently stored in Redis (no newer reconnection overtook it)
             // and no other local socket is active.
-            if (!hasOtherLocal && (!activeSocketId || activeSocketId === ws.socketId)) {
+            if (
+              !hasOtherLocal &&
+              (!activeSocketId || activeSocketId === ws.socketId)
+            ) {
               await redisPub.hDel("norby:active_users", info.user_id);
               await redisPub.zRem("norby:user_locations", info.user_id);
               await redisPub.del(`norby:user_session:${info.user_id}`);
@@ -2076,9 +2218,12 @@ async function initRedis() {
         if (allUserIds && allUserIds.length > 0) {
           const now = Date.now();
           const pipeline = redisPub.multi();
-          
-          const rawUsers = await redisPub.hmGet("norby:active_users", allUserIds);
-          
+
+          const rawUsers = await redisPub.hmGet(
+            "norby:active_users",
+            allUserIds,
+          );
+
           allUserIds.forEach((uid, idx) => {
             const raw = rawUsers[idx];
             let isZombie = true;
@@ -2090,7 +2235,7 @@ async function initRedis() {
                 }
               } catch (e) {}
             }
-            
+
             if (isZombie) {
               pipeline.zRem("norby:user_locations", uid);
               pipeline.hDel("norby:active_users", uid);
@@ -2104,7 +2249,7 @@ async function initRedis() {
               );
             }
           });
-          
+
           await pipeline.exec();
         }
       } catch (e: any) {
@@ -2141,7 +2286,7 @@ const shutdown = async () => {
     type: "server_draining",
     message: "Server is restarting, please reconnect",
   });
-  
+
   wss.clients.forEach((client) => {
     if (client.readyState === WebSocket.OPEN) {
       client.send(drainMessage);

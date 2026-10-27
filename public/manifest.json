@@ -1,11 +1,14 @@
 {
   "name": "Norby",
   "short_name": "Norby",
+  "id": "/",
   "description": "Alone and want to grab tea? ☕️ Drop a hotspot to connect with neighbours and meet up in real-time.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#000000",
   "theme_color": "#000000",
+  "orientation": "portrait-primary",
+  "categories": ["social", "lifestyle", "communication"],
   "icons": [
     {
       "src": "/icon-192x192.png",

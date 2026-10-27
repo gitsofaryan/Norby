@@ -159,23 +159,24 @@ function MapProvider(_a) {
     };
     var _q = react_1.useState(false), showIntentModal = _q[0], setShowIntentModal = _q[1];
     var _r = react_1.useState(""), intentText = _r[0], setIntentText = _r[1];
-    var _s = react_1.useState(15), customHotspotRange = _s[0], setCustomHotspotRange = _s[1];
+    var _s = react_1.useState("coffee-chat"), intentCategory = _s[0], setIntentCategory = _s[1];
+    var _t = react_1.useState(15), customHotspotRange = _t[0], setCustomHotspotRange = _t[1];
     react_1.useEffect(function () {
         if (showIntentModal) {
             setCustomHotspotRange((profile === null || profile === void 0 ? void 0 : profile.hotspotRange) || 15);
         }
     }, [showIntentModal, profile === null || profile === void 0 ? void 0 : profile.hotspotRange]);
-    var _t = react_1.useState(false), hasWaved = _t[0], setHasWaved = _t[1];
-    var _u = react_1.useState(false), confirmBlock = _u[0], setConfirmBlock = _u[1];
+    var _u = react_1.useState(false), hasWaved = _u[0], setHasWaved = _u[1];
+    var _v = react_1.useState(false), confirmBlock = _v[0], setConfirmBlock = _v[1];
     react_1.useEffect(function () {
         setHasWaved(false);
         setConfirmBlock(false);
     }, [selectedUser]);
     // Notifications and Toast streams
-    var _v = react_1.useState([]), toasts = _v[0], setToasts = _v[1];
-    var _w = react_1.useState([]), notifications = _w[0], setNotifications = _w[1];
-    var _x = react_1.useState(false), showNotifDropdown = _x[0], setShowNotifDropdown = _x[1];
-    var _y = react_1.useState([]), activeWaves = _y[0], setActiveWaves = _y[1];
+    var _w = react_1.useState([]), toasts = _w[0], setToasts = _w[1];
+    var _x = react_1.useState([]), notifications = _x[0], setNotifications = _x[1];
+    var _y = react_1.useState(false), showNotifDropdown = _y[0], setShowNotifDropdown = _y[1];
+    var _z = react_1.useState([]), activeWaves = _z[0], setActiveWaves = _z[1];
     var addToast = react_1.useCallback(function (message, type) {
         if (type === void 0) { type = "default"; }
         var id = Math.random().toString(36).substring(2, 9);
@@ -199,20 +200,20 @@ function MapProvider(_a) {
     }, []);
     // Geolocation
     var maskLocation = (_b = profile === null || profile === void 0 ? void 0 : profile.maskLocation) !== null && _b !== void 0 ? _b : true;
-    var _z = useGeolocation_1.useGeolocation(maskLocation), location = _z.location, locStatus = _z.status, isStasis = _z.isStasis, accuracy = _z.accuracy, accuracySource = _z.accuracySource, refreshLocation = _z.refreshLocation;
+    var _0 = useGeolocation_1.useGeolocation(maskLocation), location = _0.location, locStatus = _0.status, isStasis = _0.isStasis, accuracy = _0.accuracy, accuracySource = _0.accuracySource, locationEnabled = _0.locationEnabled, requestLocation = _0.requestLocation, disableLocation = _0.disableLocation, refreshLocation = _0.refreshLocation;
     // Sync lists from socket
-    var _0 = react_1.useState([]), activeUsers = _0[0], setActiveUsers = _0[1];
-    var _1 = react_1.useState([]), intents = _1[0], setIntents = _1[1];
+    var _1 = react_1.useState([]), activeUsers = _1[0], setActiveUsers = _1[1];
+    var _2 = react_1.useState([]), intents = _2[0], setIntents = _2[1];
     // Chat states have been moved to ChatProvider
     // 1-to-1 Calling state
-    var _2 = react_1.useState(null), incomingCall = _2[0], setIncomingCall = _2[1];
-    var _3 = react_1.useState(null), callStatus = _3[0], setCallStatus = _3[1];
-    var _4 = react_1.useState(null), outgoingCallUserId = _4[0], setOutgoingCallUserId = _4[1];
+    var _3 = react_1.useState(null), incomingCall = _3[0], setIncomingCall = _3[1];
+    var _4 = react_1.useState(null), callStatus = _4[0], setCallStatus = _4[1];
+    var _5 = react_1.useState(null), outgoingCallUserId = _5[0], setOutgoingCallUserId = _5[1];
     // Routing state
-    var _5 = react_1.useState(null), activeRoute = _5[0], setActiveRoute = _5[1];
-    var _6 = react_1.useState("foot"), activeRouteMode = _6[0], setActiveRouteMode = _6[1];
-    var _7 = react_1.useState(null), routingTarget = _7[0], setRoutingTarget = _7[1];
-    var _8 = react_1.useState(false), isLoadingRoute = _8[0], setIsLoadingRoute = _8[1];
+    var _6 = react_1.useState(null), activeRoute = _6[0], setActiveRoute = _6[1];
+    var _7 = react_1.useState("foot"), activeRouteMode = _7[0], setActiveRouteMode = _7[1];
+    var _8 = react_1.useState(null), routingTarget = _8[0], setRoutingTarget = _8[1];
+    var _9 = react_1.useState(false), isLoadingRoute = _9[0], setIsLoadingRoute = _9[1];
     var clearActiveRoute = react_1.useCallback(function () {
         setActiveRoute(null);
         setRoutingTarget(null);
@@ -590,10 +591,10 @@ function MapProvider(_a) {
         if (!intentText.trim())
             return;
         sounds_1.playSound("success");
-        socket.createHotspot(intentText, customHotspotRange, osmPlace);
+        socket.createHotspot(intentText, customHotspotRange, osmPlace, intentCategory);
         setIntentText("");
         setShowIntentModal(false);
-    }, [intentText, customHotspotRange, socket]);
+    }, [intentText, customHotspotRange, intentCategory, socket]);
     var requestJoin = react_1.useCallback(function (roomId) {
         var _a;
         var id = typeof roomId === "string" ? roomId : (_a = selectedHotspotRef.current) === null || _a === void 0 ? void 0 : _a.id;
@@ -756,15 +757,17 @@ function MapProvider(_a) {
             return true;
         // Match by bio or tags
         var bio = (u.bio || "").toLowerCase();
+        var projectDescription = u.projectDescription || "";
+        var openTo = Array.isArray(u.openTo) ? u.openTo.join(" ") : "";
         var tags = u.selectedTags || [];
-        if (mapFilters_1.matchesMapFilterText(bio, key))
+        if (mapFilters_1.matchesMapFilterText(bio + " " + projectDescription + " " + openTo, key))
             return true;
         if (tags.some(function (tag) { return mapFilters_1.matchesMapFilterText(tag, key); }))
             return true;
         return false;
     }
     // Filter lists based on user settings and ranges
-    var radarRadius = (profile === null || profile === void 0 ? void 0 : profile.radarRange) || 15;
+    var radarRadius = Math.max(10, Math.min(50, (profile === null || profile === void 0 ? void 0 : profile.radarRange) || 15));
     var filteredUsers = react_1.useMemo(function () {
         var blockedIds = __spreadArrays(((profile === null || profile === void 0 ? void 0 : profile.blockedUsers) || []), localBlocks);
         if (!location)
@@ -800,6 +803,9 @@ function MapProvider(_a) {
         isStasis: isStasis,
         accuracy: accuracy,
         accuracySource: accuracySource,
+        locationEnabled: locationEnabled,
+        requestLocation: requestLocation,
+        disableLocation: disableLocation,
         refreshRadar: refreshRadar,
         socketReady: socket.socketReady,
         connectionState: socket.connectionState,
@@ -822,6 +828,8 @@ function MapProvider(_a) {
         setShowIntentModal: setShowIntentModal,
         intentText: intentText,
         setIntentText: setIntentText,
+        intentCategory: intentCategory,
+        setIntentCategory: setIntentCategory,
         customHotspotRange: customHotspotRange,
         setCustomHotspotRange: setCustomHotspotRange,
         hasWaved: hasWaved,
@@ -897,6 +905,9 @@ function MapProvider(_a) {
         isStasis,
         accuracy,
         accuracySource,
+        locationEnabled,
+        requestLocation,
+        disableLocation,
         socket.socketReady,
         socket.connectionState,
         socket.offlineMessages,
@@ -910,6 +921,7 @@ function MapProvider(_a) {
         selectedHotspot,
         showIntentModal,
         intentText,
+        intentCategory,
         customHotspotRange,
         hasWaved,
         confirmBlock,
@@ -948,6 +960,7 @@ function MapProvider(_a) {
         setSelectedHotspot,
         setShowIntentModal,
         setIntentText,
+        setIntentCategory,
         setCustomHotspotRange,
         setHasWaved,
         setConfirmBlock,

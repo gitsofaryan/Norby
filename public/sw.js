@@ -6,6 +6,7 @@ const STATIC_ASSETS = [
   "/manifest.json",
   "/icon-192x192.png",
   "/icon-512x512.png",
+  "/apple-touch-icon.png",
   "https://js.puter.com/v2/"
 ];
 

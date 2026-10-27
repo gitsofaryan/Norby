@@ -2,19 +2,24 @@
 
 import { useState, useEffect, useRef } from "react";
 
-const FALLBACK = { lat: 28.6139, lng: 77.209 }; // New Delhi fallback
+const LOCATION_ENABLED_KEY = "norby_location_enabled";
 
 // Helper to calculate distance in km using Haversine formula
-export function getDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+export function getDistanceKm(
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number,
+): number {
   const R = 6371; // Radius of the Earth in km
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
   const dLon = ((lon2 - lon1) * Math.PI) / 180;
   const a =
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
     Math.cos((lat1 * Math.PI) / 180) *
-    Math.cos((lat2 * Math.PI) / 180) *
-    Math.sin(dLon / 2) *
-    Math.sin(dLon / 2);
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c;
 }
@@ -47,7 +52,9 @@ async function getIPLocation(): Promise<{ lat: number; lng: number } | null> {
           return { lat: parsed.lat, lng: parsed.lng };
         }
       }
-    } catch (e) { /* ignore */ }
+    } catch (e) {
+      /* ignore */
+    }
   }
 
   let result: { lat: number; lng: number } | null = null;
@@ -56,7 +63,10 @@ async function getIPLocation(): Promise<{ lat: number; lng: number } | null> {
     const res = await fetch("https://freeipapi.com/api/json");
     if (res.ok) {
       const data = await res.json();
-      if (typeof data.latitude === "number" && typeof data.longitude === "number") {
+      if (
+        typeof data.latitude === "number" &&
+        typeof data.longitude === "number"
+      ) {
         result = { lat: data.latitude, lng: data.longitude };
       }
     }
@@ -69,7 +79,10 @@ async function getIPLocation(): Promise<{ lat: number; lng: number } | null> {
       const res = await fetch("https://ipwho.is/");
       if (res.ok) {
         const data = await res.json();
-        if (typeof data.latitude === "number" && typeof data.longitude === "number") {
+        if (
+          typeof data.latitude === "number" &&
+          typeof data.longitude === "number"
+        ) {
           result = { lat: data.latitude, lng: data.longitude };
         }
       }
@@ -81,25 +94,37 @@ async function getIPLocation(): Promise<{ lat: number; lng: number } | null> {
   // Cache in sessionStorage for 10 minutes
   if (result && typeof window !== "undefined") {
     try {
-      sessionStorage.setItem("norby_ip_location", JSON.stringify({
-        lat: result.lat,
-        lng: result.lng,
-        expires: Date.now() + 10 * 60 * 1000,
-      }));
-    } catch (e) { /* ignore */ }
+      sessionStorage.setItem(
+        "norby_ip_location",
+        JSON.stringify({
+          lat: result.lat,
+          lng: result.lng,
+          expires: Date.now() + 10 * 60 * 1000,
+        }),
+      );
+    } catch (e) {
+      /* ignore */
+    }
   }
 
   return result;
 }
 
 export function useGeolocation(maskLocation: boolean = true) {
-  const [location, setLocationState] = useState<{ lat: number; lng: number } | null>(() => {
+  const [location, setLocationState] = useState<{
+    lat: number;
+    lng: number;
+  } | null>(() => {
     if (typeof window !== "undefined") {
+      if (localStorage.getItem(LOCATION_ENABLED_KEY) !== "true") return null;
       const cached = localStorage.getItem("norby_last_location");
       if (cached) {
         try {
           const parsed = JSON.parse(cached);
-          if (typeof parsed.lat === "number" && typeof parsed.lng === "number") {
+          if (
+            typeof parsed.lat === "number" &&
+            typeof parsed.lng === "number"
+          ) {
             return parsed;
           }
         } catch (e) {
@@ -110,11 +135,27 @@ export function useGeolocation(maskLocation: boolean = true) {
     return null;
   });
 
-  const [status, setStatusState] = useState<"waiting" | "granted" | "denied">("waiting");
+  const [status, setStatusState] = useState<"waiting" | "granted" | "denied">(
+    "waiting",
+  );
+  const [locationEnabled, setLocationEnabled] = useState(() => {
+    return (
+      typeof window !== "undefined" &&
+      localStorage.getItem(LOCATION_ENABLED_KEY) === "true"
+    );
+  });
   const statusRef = useRef(status);
   statusRef.current = status;
 
-  const setStatus = (val: "waiting" | "granted" | "denied" | ((prev: "waiting" | "granted" | "denied") => "waiting" | "granted" | "denied")) => {
+  const setStatus = (
+    val:
+      | "waiting"
+      | "granted"
+      | "denied"
+      | ((
+          prev: "waiting" | "granted" | "denied",
+        ) => "waiting" | "granted" | "denied"),
+  ) => {
     if (typeof val === "function") {
       setStatusState((prev) => {
         const next = val(prev);
@@ -129,7 +170,9 @@ export function useGeolocation(maskLocation: boolean = true) {
 
   const [isStasis, setIsStasis] = useState(false);
   const [accuracy, setAccuracy] = useState<number | null>(null);
-  const [accuracySource, setAccuracySource] = useState<"gps-high" | "gps-low" | "ip-fallback" | "offline" | "waiting">("waiting");
+  const [accuracySource, setAccuracySource] = useState<
+    "gps-high" | "gps-low" | "ip-fallback" | "offline" | "waiting"
+  >("waiting");
   const hasGPSRef = useRef(false);
   const wakeFromStasisRef = useRef<(() => void) | null>(null);
 
@@ -145,6 +188,12 @@ export function useGeolocation(maskLocation: boolean = true) {
   };
 
   useEffect(() => {
+    if (!locationEnabled) {
+      setStatus("waiting");
+      setAccuracySource("waiting");
+      return;
+    }
+
     let finished = false;
     let watchId: number | null = null;
     let passivePollInterval: ReturnType<typeof setInterval> | null = null;
@@ -158,7 +207,9 @@ export function useGeolocation(maskLocation: boolean = true) {
     getIPLocation()
       .then((ipLoc) => {
         if (!finished && ipLoc && !hasGPSRef.current) {
-          const offset = maskLocation ? getStableOffset(ipLoc.lat, ipLoc.lng) : { latOffset: 0, lngOffset: 0 };
+          const offset = maskLocation
+            ? getStableOffset(ipLoc.lat, ipLoc.lng)
+            : { latOffset: 0, lngOffset: 0 };
           const newLat = ipLoc.lat + offset.latOffset;
           const newLng = ipLoc.lng + offset.lngOffset;
           if (!locationRef.current) {
@@ -171,8 +222,6 @@ export function useGeolocation(maskLocation: boolean = true) {
       .catch((err) => {
         console.warn("IP Geolocation mount error:", err);
       });
-
-
 
     const startHighAccuracyWatch = () => {
       if (watchId !== null) return;
@@ -189,7 +238,11 @@ export function useGeolocation(maskLocation: boolean = true) {
         (pos) => {
           // Discard extremely inaccurate coordinates (e.g. > 5km) which often happen during poor signal
           if (pos.coords.accuracy > 5000) {
-            console.log("[norby] Discarding low-accuracy GPS signal:", pos.coords.accuracy, "meters");
+            console.log(
+              "[norby] Discarding low-accuracy GPS signal:",
+              pos.coords.accuracy,
+              "meters",
+            );
             return;
           }
 
@@ -198,8 +251,12 @@ export function useGeolocation(maskLocation: boolean = true) {
           const lat = pos.coords.latitude;
           const lng = pos.coords.longitude;
           setAccuracy(pos.coords.accuracy);
-          setAccuracySource(pos.coords.accuracy <= 200 ? "gps-high" : "gps-low");
-          const offset = maskLocation ? getStableOffset(lat, lng) : { latOffset: 0, lngOffset: 0 };
+          setAccuracySource(
+            pos.coords.accuracy <= 200 ? "gps-high" : "gps-low",
+          );
+          const offset = maskLocation
+            ? getStableOffset(lat, lng)
+            : { latOffset: 0, lngOffset: 0 };
           const newLat = lat + offset.latOffset;
           const newLng = lng + offset.lngOffset;
 
@@ -222,7 +279,9 @@ export function useGeolocation(maskLocation: boolean = true) {
           } else {
             // If user has been stationary for more than 3 minutes, transition to passive battery saver!
             if (Date.now() - lastMoveTime > 180000 && !localIsStasis) {
-              console.log("[norby] User is stationary. Transitioning to low-power stasis GPS poll.");
+              console.log(
+                "[norby] User is stationary. Transitioning to low-power stasis GPS poll.",
+              );
               localIsStasis = true;
               setIsStasis(true);
               switchToPassivePoll();
@@ -237,7 +296,7 @@ export function useGeolocation(maskLocation: boolean = true) {
             setAccuracySource("offline");
           }
         },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
       );
     };
 
@@ -258,22 +317,34 @@ export function useGeolocation(maskLocation: boolean = true) {
             setAccuracy(pos.coords.accuracy);
 
             if (lastLatitude !== null && lastLongitude !== null) {
-              const movedDist = getDistanceKm(lastLatitude, lastLongitude, lat, lng);
+              const movedDist = getDistanceKm(
+                lastLatitude,
+                lastLongitude,
+                lat,
+                lng,
+              );
               if (movedDist > 0.005) {
                 // User has started moving! Exit stasis and restore active high-power GPS watch
-                console.log("[norby] Movement detected during stasis. Waking up high-power GPS watch.");
+                console.log(
+                  "[norby] Movement detected during stasis. Waking up high-power GPS watch.",
+                );
                 startHighAccuracyWatch();
 
-                const offset = maskLocation ? getStableOffset(lat, lng) : { latOffset: 0, lngOffset: 0 };
-                setLocation({ lat: lat + offset.latOffset, lng: lng + offset.lngOffset });
+                const offset = maskLocation
+                  ? getStableOffset(lat, lng)
+                  : { latOffset: 0, lngOffset: 0 };
+                setLocation({
+                  lat: lat + offset.latOffset,
+                  lng: lng + offset.lngOffset,
+                });
               }
             } else {
               lastLatitude = lat;
               lastLongitude = lng;
             }
           },
-          () => { },
-          { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 }
+          () => {},
+          { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 },
         );
       }, 120000);
     };
@@ -288,17 +359,21 @@ export function useGeolocation(maskLocation: boolean = true) {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         if (!finished && !hasGPSRef.current) {
-          const offset = maskLocation ? getStableOffset(pos.coords.latitude, pos.coords.longitude) : { latOffset: 0, lngOffset: 0 };
+          const offset = maskLocation
+            ? getStableOffset(pos.coords.latitude, pos.coords.longitude)
+            : { latOffset: 0, lngOffset: 0 };
           const newLat = pos.coords.latitude + offset.latOffset;
           const newLng = pos.coords.longitude + offset.lngOffset;
           setLocation({ lat: newLat, lng: newLng });
           setAccuracy(pos.coords.accuracy);
-          setAccuracySource(pos.coords.accuracy <= 200 ? "gps-high" : "gps-low");
+          setAccuracySource(
+            pos.coords.accuracy <= 200 ? "gps-high" : "gps-low",
+          );
           setStatus("granted");
         }
       },
-      () => { }, // Ignore errors, watchPosition will handle it
-      { enableHighAccuracy: false, timeout: 5000, maximumAge: Infinity }
+      () => {}, // Ignore errors, watchPosition will handle it
+      { enableHighAccuracy: false, timeout: 5000, maximumAge: Infinity },
     );
 
     // Start active high-accuracy watch tracking immediately
@@ -307,7 +382,9 @@ export function useGeolocation(maskLocation: boolean = true) {
     // Listen to user map interactions to wake up from stasis instantly
     const handleUserWakeup = () => {
       if (localIsStasis) {
-        console.log("[norby] User interaction detected. Waking up high-power GPS watch.");
+        console.log(
+          "[norby] User interaction detected. Waking up high-power GPS watch.",
+        );
         startHighAccuracyWatch();
       } else {
         lastMoveTime = Date.now(); // reset timer on click/activity
@@ -332,69 +409,109 @@ export function useGeolocation(maskLocation: boolean = true) {
         clearInterval(passivePollInterval);
       }
     };
-  }, [maskLocation]);
+  }, [locationEnabled, maskLocation]);
+
+  const requestLocation = () => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem(LOCATION_ENABLED_KEY, "true");
+    }
+    setLocationEnabled(true);
+  };
+
+  const disableLocation = () => {
+    if (typeof window !== "undefined") {
+      localStorage.removeItem(LOCATION_ENABLED_KEY);
+      localStorage.removeItem("norby_last_location");
+    }
+    hasGPSRef.current = false;
+    setLocationState(null);
+    setAccuracy(null);
+    setAccuracySource("waiting");
+    setStatus("waiting");
+    setLocationEnabled(false);
+  };
 
   const refreshLocation = () => {
+    if (!locationEnabled) {
+      return Promise.resolve(null);
+    }
+
     // Wake from stasis if currently in low-power mode
     if (wakeFromStasisRef.current) {
       wakeFromStasisRef.current();
     }
 
-    return new Promise<{ lat: number; lng: number } | null>((resolve, reject) => {
-      let finished = false;
+    return new Promise<{ lat: number; lng: number } | null>(
+      (resolve, reject) => {
+        let finished = false;
 
-      getIPLocation()
-        .then((ipLoc) => {
-          if (!finished && ipLoc && !locationRef.current && !hasGPSRef.current) {
-            const offset = maskLocation ? getStableOffset(ipLoc.lat, ipLoc.lng) : { latOffset: 0, lngOffset: 0 };
-            const newCoords = {
-              lat: ipLoc.lat + offset.latOffset,
-              lng: ipLoc.lng + offset.lngOffset,
-            };
-            setLocation(newCoords);
-            setStatus("granted");
-            setAccuracySource("ip-fallback");
-          }
-        })
-        .catch((err) => console.warn("IP location error on refresh:", err));
-
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          (pos) => {
-            finished = true;
-            if (pos.coords.accuracy > 5000 && locationRef.current) {
-              console.log("[norby] Discarding low-accuracy GPS on refresh");
-              resolve(locationRef.current);
-              return;
+        getIPLocation()
+          .then((ipLoc) => {
+            if (
+              !finished &&
+              ipLoc &&
+              !locationRef.current &&
+              !hasGPSRef.current
+            ) {
+              const offset = maskLocation
+                ? getStableOffset(ipLoc.lat, ipLoc.lng)
+                : { latOffset: 0, lngOffset: 0 };
+              const newCoords = {
+                lat: ipLoc.lat + offset.latOffset,
+                lng: ipLoc.lng + offset.lngOffset,
+              };
+              setLocation(newCoords);
+              setStatus("granted");
+              setAccuracySource("ip-fallback");
             }
-            hasGPSRef.current = true;
-            const offset = maskLocation ? getStableOffset(pos.coords.latitude, pos.coords.longitude) : { latOffset: 0, lngOffset: 0 };
-            const newCoords = {
-              lat: pos.coords.latitude + offset.latOffset,
-              lng: pos.coords.longitude + offset.lngOffset,
-            };
-            setLocation(newCoords);
-            setAccuracy(pos.coords.accuracy);
-            setAccuracySource(pos.coords.accuracy <= 200 ? "gps-high" : "gps-low");
-            setStatus("granted");
-            resolve(newCoords);
-          },
-          (err) => {
-            finished = true;
-            resolve(locationRef.current);
-          },
-          { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
-        );
-      } else {
-        finished = true;
-        resolve(locationRef.current);
-      }
-    });
+          })
+          .catch((err) => console.warn("IP location error on refresh:", err));
+
+        if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => {
+              finished = true;
+              if (pos.coords.accuracy > 5000 && locationRef.current) {
+                console.log("[norby] Discarding low-accuracy GPS on refresh");
+                resolve(locationRef.current);
+                return;
+              }
+              hasGPSRef.current = true;
+              const offset = maskLocation
+                ? getStableOffset(pos.coords.latitude, pos.coords.longitude)
+                : { latOffset: 0, lngOffset: 0 };
+              const newCoords = {
+                lat: pos.coords.latitude + offset.latOffset,
+                lng: pos.coords.longitude + offset.lngOffset,
+              };
+              setLocation(newCoords);
+              setAccuracy(pos.coords.accuracy);
+              setAccuracySource(
+                pos.coords.accuracy <= 200 ? "gps-high" : "gps-low",
+              );
+              setStatus("granted");
+              resolve(newCoords);
+            },
+            (err) => {
+              finished = true;
+              resolve(locationRef.current);
+            },
+            { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 },
+          );
+        } else {
+          finished = true;
+          resolve(locationRef.current);
+        }
+      },
+    );
   };
 
   return {
     location,
     status,
+    locationEnabled,
+    requestLocation,
+    disableLocation,
     accuracy,
     accuracySource,
     isStasis,
